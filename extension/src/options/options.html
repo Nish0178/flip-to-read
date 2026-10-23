@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flip to Read Settings &amp; About</title>
+  <link rel="icon" type="image/png" href="../icons/icon32.png">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body class="options-body">
+
+  <div class="options-container">
+
+    <!-- Header -->
+    <header class="options-header">
+      <div class="options-brand">
+        <img src="../icons/icon48.png" alt="Flip to Read" class="options-logo">
+        <div>
+          <h1 class="options-title"><span style="color:#264653;">Flip</span> <span style="color:#64748b;">to</span> <span style="color:#E76F51;">Read</span></h1>
+          <p class="options-subtitle">Turn PDFs into an immersive reading experience.</p>
+        </div>
+      </div>
+      <a href="http://localhost:8080" target="_blank" class="btn-website">Open Web Platform &rsaquo;</a>
+    </header>
+
+    <!-- Settings Card -->
+    <section class="card options-card">
+      <h2 class="card-title">Extension Settings</h2>
+
+      <!-- Backend Server URL -->
+      <div class="setting-item">
+        <div class="setting-text">
+          <label for="server-url" class="setting-label">Flip to Read Server URL</label>
+          <span class="setting-desc">The address of your Spring Boot backend service. Default is http://localhost:8080.</span>
+        </div>
+        <div class="setting-control">
+          <input type="text" id="server-url" class="text-input" placeholder="http://localhost:8080">
+        </div>
+      </div>
+
+      <!-- Remember Reading Position -->
+      <div class="setting-item">
+        <div class="setting-text">
+          <label class="setting-label">Remember Reading Position</label>
+          <span class="setting-desc">Save the last read page of recently viewed books so you can resume where you stopped.</span>
+        </div>
+        <div class="setting-control">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-remember-pos" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Open in Website vs Extension Reader -->
+      <div class="setting-item">
+        <div class="setting-text">
+          <label class="setting-label">Open Online PDFs in Web Platform</label>
+          <span class="setting-desc">When enabled, detected PDFs will open in the main website tab rather than the internal extension reader.</span>
+        </div>
+        <div class="setting-control">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-open-in-website">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Open PDFs Automatically -->
+      <div class="setting-item">
+        <div class="setting-text">
+          <label class="setting-label">Open Direct PDFs Automatically</label>
+          <span class="setting-desc">When opening a direct .pdf tab, automatically prompt or convert into Flip to Read.</span>
+        </div>
+        <div class="setting-control">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-auto-open">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Clear History -->
+      <div class="setting-item">
+        <div class="setting-text">
+          <label class="setting-label">Local Reading History</label>
+          <span class="setting-desc">Clear saved recent books and reading bookmarks from this browser.</span>
+        </div>
+        <div class="setting-control">
+          <button type="button" class="btn-danger" id="btn-clear-history">Clear History</button>
+        </div>
+      </div>
+
+      <!-- Save Feedback -->
+      <div class="save-bar">
+        <span class="save-msg" id="save-msg" style="display: none;">✓ Settings saved successfully.</span>
+        <button type="button" class="btn-save" id="btn-save-settings">Save Settings</button>
+      </div>
+    </section>
+
+    <!-- Privacy & Security Guarantee Card -->
+    <section class="card options-card">
+      <h2 class="card-title">🛡️ Privacy &amp; Data Ethics</h2>
+      <div class="privacy-content">
+        <p><strong>Flip to Read is built with a strict privacy-first foundation:</strong></p>
+        <ul class="privacy-list">
+          <li><strong>No Background Surveillance:</strong> The extension does not monitor, record, or transmit your browsing history or visited URLs.</li>
+          <li><strong>No Silent Uploads:</strong> PDFs are NEVER uploaded or processed automatically without your explicit action ("Open as Flipbook" or "Upload Local PDF").</li>
+          <li><strong>Local Storage Only:</strong> Reading bookmarks are stored securely inside your browser's <code>chrome.storage.local</code>.</li>
+          <li><strong>Minimal Permissions:</strong> Only strictly required browser capabilities (<code>storage</code>, <code>activeTab</code>, <code>tabs</code>, <code>contextMenus</code>) are used.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="card options-card">
+      <h2 class="card-title">About Flip to Read</h2>
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;">
+        Flip to Read is an open-source, full-stack PDF flipbook platform engineered with <strong>Java 21, Spring Boot, PyMuPDF, PageFlip, and Chrome Manifest V3</strong>. It transforms static documents into interactive 3D books with realistic physics-based page flips, zero scrolling, and single-file offline standalone downloads.
+      </p>
+      <div style="font-size: 0.8rem; color: var(--text-dim);">
+        Version 1.0.0 &bull; Architecture: Spring Boot API &plus; Chrome/Edge Extension &plus; PyMuPDF Service
+      </div>
+    </section>
+
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

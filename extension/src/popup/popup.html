@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flip to Read</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body class="popup-body">
+
+  <!-- Header -->
+  <header class="popup-header">
+    <div class="header-brand">
+      <img src="../icons/icon32.png" alt="Flip to Read" class="brand-icon">
+      <div class="brand-title-wrap">
+        <span class="brand-title"><span style="color:#264653;">Flip</span> <span style="color:#64748b;">to</span> <span style="color:#E76F51;">Read</span></span>
+        <span class="brand-tagline">PDF Flipbook Platform</span>
+      </div>
+    </div>
+    <button type="button" class="btn-icon" id="btn-options" title="Settings" aria-label="Settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Main Container -->
+  <main class="popup-main">
+
+    <!-- Active Tab PDF Detector Card -->
+    <div class="card detector-card" id="detector-card">
+      <div class="card-label">Current Page</div>
+
+      <div id="detector-state-loading" class="state-loading">
+        <div class="mini-spinner"></div>
+        <span>Detecting PDF in current tab...</span>
+      </div>
+
+      <div id="detector-state-found" class="state-found" style="display: none;">
+        <div class="detected-pdf-info">
+          <div class="pdf-file-icon">📄</div>
+          <div class="pdf-file-details">
+            <span class="detected-pdf-title" id="detected-title">document.pdf</span>
+            <span class="detected-pdf-url" id="detected-url">https://example.com/file.pdf</span>
+          </div>
+        </div>
+        <button type="button" class="btn-primary" id="btn-open-flipbook">
+          <span>📖 Open as Flipbook</span>
+        </button>
+      </div>
+
+      <div id="detector-state-none" class="state-none" style="display: none;">
+        <span class="no-pdf-icon">🔍</span>
+        <span class="no-pdf-text">No PDF detected on this page.</span>
+        <button type="button" class="btn-subtle" id="btn-re-detect">Detect Again</button>
+      </div>
+    </div>
+
+    <!-- Conversion & Upload Progress Area -->
+    <div class="progress-box" id="popup-progress" style="display: none;">
+      <div class="progress-label-row">
+        <div class="mini-spinner"></div>
+        <span id="progress-status-text">Uploading PDF...</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill"></div>
+      </div>
+    </div>
+
+    <!-- Error Alert Area -->
+    <div class="error-box" id="popup-error" style="display: none;">
+      <span class="error-icon">⚠️</span>
+      <span class="error-text" id="popup-error-text">Failed to convert PDF.</span>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <button type="button" class="btn-action" id="btn-upload-local">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <span>Upload Local PDF</span>
+      </button>
+      <input type="file" id="local-file-input" accept="application/pdf,.pdf" style="display: none;">
+
+      <button type="button" class="btn-action" id="btn-open-website">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        <span>Open Flip to Read</span>
+      </button>
+    </div>
+
+    <!-- Recent Books Shelf -->
+    <div class="card recent-card">
+      <div class="recent-header">
+        <span class="card-label" style="margin-bottom:0;">Recent Books</span>
+        <button type="button" class="btn-clear-recent" id="btn-clear-recent">Clear</button>
+      </div>
+      <div class="recent-list" id="recent-list">
+        <!-- Rendered via TS -->
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

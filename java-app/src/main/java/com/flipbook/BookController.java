@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,7 +41,7 @@ public class BookController {
         this.standaloneService = standaloneService;
     }
 
-    @PostMapping("/upload")
+    @PostMapping({"/upload", "/books/upload"})
     public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file) {
         try {
             String id = service.convert(file);
@@ -49,7 +52,27 @@ public class BookController {
         }
     }
 
-    @GetMapping("/books/{id}")
+    @PostMapping("/upload-url")
+    public ResponseEntity<?> uploadUrl(
+            @RequestParam(value = "url", required = false) String formUrl,
+            @RequestBody(required = false) Map<String, String> body) {
+        try {
+            String urlStr = formUrl;
+            if ((urlStr == null || urlStr.isBlank()) && body != null && body.containsKey("url")) {
+                urlStr = body.get("url");
+            }
+            if (urlStr == null || urlStr.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "URL parameter 'url' is required."));
+            }
+            String id = service.convertFromUrl(urlStr);
+            Map<String, Object> meta = service.meta(id);
+            return ResponseEntity.ok(meta != null ? meta : Map.of("id", id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage() != null ? e.getMessage() : "URL conversion failed"));
+        }
+    }
+
+    @GetMapping({"/books/{id}", "/books/{id}/metadata"})
     public ResponseEntity<?> book(@PathVariable String id) throws Exception {
         if (!ID.matcher(id).matches()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid id"));
@@ -59,6 +82,28 @@ public class BookController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Flipbook not found"));
         }
         return ResponseEntity.ok(meta);
+    }
+
+    @GetMapping("/books/{id}/pages")
+    public ResponseEntity<?> pages(@PathVariable String id) throws Exception {
+        if (!ID.matcher(id).matches()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid id"));
+        }
+        Map<String, Object> meta = service.meta(id);
+        if (meta == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Flipbook not found"));
+        }
+        int pageCount = meta.get("pages") instanceof Number ? ((Number) meta.get("pages")).intValue() : 0;
+        List<String> pageList = new ArrayList<>();
+        for (int i = 1; i <= pageCount; i++) {
+            pageList.add("/books/" + id + "/page-" + i + ".jpg");
+        }
+        return ResponseEntity.ok(Map.of(
+                "id", id,
+                "title", meta.getOrDefault("title", "Flipbook"),
+                "pageCount", pageCount,
+                "pages", pageList
+        ));
     }
 
     @GetMapping("/books/{id}/pdf")

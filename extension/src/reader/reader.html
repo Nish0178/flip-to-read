@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Flip to Read — Extension Reader</title>
+  <link rel="icon" type="image/png" href="../icons/icon32.png">
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body class="reader-body">
+
+  <div class="reader-container" id="reader-app">
+
+    <!-- Top Reader Toolbar -->
+    <header class="reader-header" id="reader-header">
+      <div class="reader-header-left">
+        <a href="#" class="reader-brand-link" id="btn-reader-logo" title="Flip to Read">
+          <img src="../icons/icon32.png" alt="Flip to Read" class="reader-brand-icon">
+          <span class="reader-brand-text">
+            <span class="brand-flip">Flip</span> <span class="brand-to">to</span> <span class="brand-read">Read</span>
+          </span>
+        </a>
+        <div class="reader-divider"></div>
+        <div class="reader-book-title" id="book-title" title="Document">Loading book...</div>
+      </div>
+
+      <!-- Center Page Counter & Jump Popover -->
+      <div class="reader-header-center">
+        <div class="page-jump-wrapper">
+          <button type="button" class="page-counter-badge" id="btn-page-badge" title="Click to jump to page">
+            <span id="page-counter-text">Page ...</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </button>
+          <div class="page-jump-popover" id="page-jump-popover">
+            <label for="jump-input" style="font-size: 0.8rem; color: var(--text-muted);">Go to:</label>
+            <input type="number" id="jump-input" class="page-jump-input" min="1" value="1">
+            <button type="button" class="btn-jump-go" id="btn-jump-go">Go</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Action Toolbar -->
+      <div class="reader-header-right">
+        <!-- Open in Flip to Read Website Button -->
+        <button type="button" class="btn-toolbar btn-open-web" id="btn-open-in-website" title="Open this book in the main Flip to Read website">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+          <span>Open in Flip to Read</span>
+        </button>
+
+        <!-- Fullscreen Button -->
+        <button type="button" class="btn-toolbar" id="btn-fullscreen" title="Toggle Fullscreen">
+          <svg id="fullscreen-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
+          <span id="fullscreen-text">Fullscreen</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Viewport (Zero body scroll, auto-fit book stage) -->
+    <main class="reader-viewport" id="reader-viewport">
+      <!-- Loading Overlay -->
+      <div class="reader-overlay" id="loading-overlay">
+        <div class="reader-spinner"></div>
+        <div class="overlay-msg" id="loading-msg">Loading interactive flipbook...</div>
+      </div>
+
+      <!-- Error Overlay -->
+      <div class="reader-overlay" id="error-overlay" style="display: none;">
+        <div class="reader-error-card">
+          <span style="font-size: 2rem;">⚠️</span>
+          <div class="reader-error-title" id="error-title">Unable to Load Flipbook</div>
+          <div class="reader-error-desc" id="error-desc">Could not connect to the Flip to Read server.</div>
+          <button type="button" class="btn-primary" id="btn-error-retry" style="margin-top: 10px; width: auto; padding: 8px 16px;">
+            Retry Connection
+          </button>
+        </div>
+      </div>
+
+      <!-- Center Book Stage -->
+      <div id="book-stage">
+        <div id="book"></div>
+      </div>
+
+      <!-- Resume Reading Toast -->
+      <div class="resume-toast" id="resume-toast" style="display: none;">
+        <span id="resume-toast-text">Continue from page 1?</span>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn-resume-action" id="btn-resume-continue">Continue</button>
+          <button type="button" class="btn-resume-dismiss" id="btn-resume-start">Start Over</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Controls Bar -->
+    <footer class="reader-controls-bar" id="reader-controls-bar">
+      <button type="button" class="btn-ctrl" id="btn-prev" aria-label="Previous Page">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        <span>Prev</span>
+      </button>
+
+      <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted);" id="bottom-counter">
+        Page 1 / 1
+      </div>
+
+      <button type="button" class="btn-ctrl" id="btn-next" aria-label="Next Page">
+        <span>Next</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </footer>
+
+  </div>
+
+  <script src="../lib/page-flip.browser.js"></script>
+  <script type="module" src="reader.js"></script>
+</body>
+</html>

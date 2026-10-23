@@ -66,6 +66,13 @@ public class StandaloneFlipbookService {
         String pdfWorkerJs = new String(pdfWorkerBytes, StandardCharsets.UTF_8);
         String pageFlipJs = new String(pageFlipJsBytes, StandardCharsets.UTF_8);
 
+        // Load transparent icon for offline standalone branding
+        String iconDataUri = "";
+        try {
+            byte[] iconBytes = loadResource("static/favicon.png");
+            iconDataUri = "data:image/png;base64," + Base64.getEncoder().encodeToString(iconBytes);
+        } catch (Exception ignored) {}
+
         // Stream output directly via BufferedWriter to minimize memory overhead
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
             writer.write("<!DOCTYPE html>\n");
@@ -73,13 +80,16 @@ public class StandaloneFlipbookService {
             writer.write("<head>\n");
             writer.write("  <meta charset=\"UTF-8\">\n");
             writer.write("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n");
-            writer.write("  <title>" + ConverterService.escapeHtml(rawTitle) + " - Interactive Flipbook</title>\n");
+            writer.write("  <title>" + ConverterService.escapeHtml(rawTitle) + " — Flip to Read</title>\n");
+            if (!iconDataUri.isBlank()) {
+                writer.write("  <link rel=\"icon\" type=\"image/png\" href=\"" + iconDataUri + "\">\n");
+            }
             writer.write("  <style>\n");
             writer.write(getStandaloneCss());
             writer.write("  </style>\n");
             writer.write("</head>\n");
             writer.write("<body>\n");
-            writer.write(getStandaloneHtmlBody(rawTitle));
+            writer.write(getStandaloneHtmlBody(rawTitle, iconDataUri));
 
             // Embed PDF.js Worker as text so it can be turned into a Blob URL offline
             writer.write("\n  <!-- Embedded PDF.js Worker Code -->\n");
@@ -194,17 +204,24 @@ public class StandaloneFlipbookService {
     .title-area {
       display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;
     }
-    .brand-icon {
-      width: 28px; height: 28px; border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--teal) 100%);
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    .brand-icon-img {
+      height: 28px; width: auto; display: block; flex-shrink: 0;
+      background: transparent !important; border: none !important;
+      border-radius: 0 !important; box-shadow: none !important;
+      filter: drop-shadow(0 2px 6px rgba(42, 157, 143, 0.22));
     }
-    .brand-icon svg { width: 16px; height: 16px; fill: #ffffff; }
-    .brand-badge {
-      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-      padding: 3px 8px; border-radius: 6px;
-      background: var(--teal-light); color: var(--teal); border: 1px solid var(--teal-border);
-      white-space: nowrap; flex-shrink: 0;
+    .brand-text {
+      font-size: 1.05rem; font-weight: 800; display: inline-flex;
+      align-items: baseline; gap: 2px; flex-shrink: 0; white-space: nowrap;
+    }
+    .brand-flip { color: #264653; }
+    .brand-to { color: #64748b; font-size: 0.85rem; font-weight: 600; margin: 0 1px; }
+    .brand-read {
+      background: linear-gradient(135deg, #F4A261 0%, #E76F51 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .brand-divider {
+      width: 1px; height: 18px; background: var(--border-subtle); margin: 0 4px; flex-shrink: 0;
     }
     .book-title {
       font-size: 0.95rem; font-weight: 600; color: var(--text-main);
@@ -305,15 +322,17 @@ public class StandaloneFlipbookService {
 """;
     }
 
-    private String getStandaloneHtmlBody(String title) {
+    private String getStandaloneHtmlBody(String title, String iconDataUri) {
         String escaped = ConverterService.escapeHtml(title);
+        String iconHtml = !iconDataUri.isBlank()
+                ? "        <img src=\"" + iconDataUri + "\" class=\"brand-icon-img\" alt=\"Flip to Read\">\n"
+                : "";
         return "  <div class=\"app\">\n"
              + "    <header>\n"
              + "      <div class=\"title-area\">\n"
-             + "        <div class=\"brand-icon\">\n"
-             + "          <svg viewBox=\"0 0 24 24\"><path d=\"M19 2H6c-1.2 0-2 .8-2 2v16c0 1.2.8 2 2 2h13c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1zm-1 18H6.5c-.3 0-.5-.2-.5-.5s.2-.5.5-.5H18V20zm0-3H6.5c-.8 0-1.5.7-1.5 1.5V4.5c0-.3.2-.5.5-.5H18v13z\"/></svg>\n"
-             + "        </div>\n"
-             + "        <span class=\"brand-badge\">Flipbook</span>\n"
+             + iconHtml
+             + "        <span class=\"brand-text\"><span class=\"brand-flip\">Flip</span><span class=\"brand-to\">to</span><span class=\"brand-read\">Read</span></span>\n"
+             + "        <div class=\"brand-divider\"></div>\n"
              + "        <span class=\"book-title\" title=\"" + escaped + "\">" + escaped + "</span>\n"
              + "      </div>\n"
              + "      <div class=\"header-center\">\n"

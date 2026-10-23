@@ -1,9 +1,32 @@
+# Maven build targets
 target/
 java-app/target/
+*.class
+
+# Node dependencies & extension build outputs
+node_modules/
+extension/node_modules/
+extension/dist/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local runtime storage & uploads
 storage/
 java-app/storage/
+uploads/
+generated/
+
+# Environment & sensitive configuration
+.env
+.env.*
+
+# Temporary / test document formats
 *.pdf
 *.zip
-__pycache__/
+
+# Operating system & editor files
 .DS_Store
 Thumbs.db
+*.log

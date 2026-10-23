@@ -1,0 +1,15 @@
+{
+  "name": "flip-to-read-extension",
+  "version": "1.0.0",
+  "description": "Turn PDFs into an immersive reading experience with realistic 3D flipbook page turns.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.5"
+  }
+}

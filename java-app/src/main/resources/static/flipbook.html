@@ -3,8 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Flipbook Reader</title>
+  <title>Flip to Read</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="logo-icon.png">
   <link rel="stylesheet" href="style.css">
+  <style>
+    .resume-toast {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(38, 70, 83, 0.95);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 30px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      z-index: 1000;
+    }
+    .btn-resume-action {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      padding: 4px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-resume-action:hover {
+      opacity: 0.9;
+    }
+    .btn-resume-dismiss {
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      padding: 4px 10px;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body class="reader-body">
 
@@ -13,12 +58,11 @@
     <!-- Top Reader Toolbar -->
     <header class="reader-header" id="reader-header">
       <div class="reader-header-left">
-        <a href="/" class="btn-nav-home" id="btn-nav-home" aria-label="Back to Upload">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          <span>Home</span>
+        <a href="/" class="reader-brand-link" id="btn-nav-home" aria-label="Back to Flip to Read" title="Back to Flip to Read">
+          <img src="logo-icon.png" alt="Flip to Read" class="reader-brand-icon">
+          <span class="reader-brand-text">
+            <span class="brand-flip">Flip</span> <span class="brand-to">to</span> <span class="brand-read">Read</span>
+          </span>
         </a>
 
         <div class="reader-divider"></div>
@@ -125,6 +169,15 @@
       <!-- Center Book Stage -->
       <div id="book-stage">
         <div id="book"></div>
+      </div>
+
+      <!-- Resume Reading Toast -->
+      <div class="resume-toast" id="resume-toast" style="display: none;">
+        <span id="resume-toast-text">Continue from page 1?</span>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn-resume-action" id="btn-resume-continue">Continue</button>
+          <button type="button" class="btn-resume-dismiss" id="btn-resume-start">Start Over</button>
+        </div>
       </div>
     </main>
 
@@ -268,6 +321,30 @@
         jumpPopover.classList.remove('active');
       }
 
+      const resumeToast = document.getElementById('resume-toast');
+      const resumeToastText = document.getElementById('resume-toast-text');
+      const btnResumeContinue = document.getElementById('btn-resume-continue');
+      const btnResumeStart = document.getElementById('btn-resume-start');
+
+      function saveReadingState(currentPage) {
+        if (!bookMeta || !id) return;
+        try {
+          localStorage.setItem('flip_pos_' + id, currentPage);
+          const raw = localStorage.getItem('flip_recent_books');
+          let list = raw ? JSON.parse(raw) : [];
+          list = list.filter(item => item.id !== id);
+          list.unshift({
+            id: id,
+            title: bookMeta.title || bookMeta.filename || "Flipbook",
+            pages: bookMeta.pages,
+            lastPage: currentPage,
+            timestamp: Date.now()
+          });
+          if (list.length > 8) list = list.slice(0, 8);
+          localStorage.setItem('flip_recent_books', JSON.stringify(list));
+        } catch (e) {}
+      }
+
       // Initialize reader
       async function init() {
         try {
@@ -289,7 +366,38 @@
 
           jumpInput.max = bookMeta.pages;
 
-          buildFlipbook(0);
+          // Check URL param or stored reading position
+          const urlParams = new URLSearchParams(window.location.search);
+          const pageParam = parseInt(urlParams.get('page'), 10);
+          const storedPos = parseInt(localStorage.getItem('flip_pos_' + id), 10);
+
+          let startPage = 0;
+          if (!isNaN(pageParam) && pageParam >= 1 && pageParam <= bookMeta.pages) {
+            startPage = pageParam - 1;
+          }
+
+          buildFlipbook(startPage);
+
+          // Prompt to continue if a saved position > 1 exists
+          if (isNaN(pageParam) && !isNaN(storedPos) && storedPos > 1 && storedPos <= bookMeta.pages) {
+            resumeToastText.textContent = `Continue from page ${storedPos}?`;
+            resumeToast.style.display = 'flex';
+
+            btnResumeContinue.onclick = () => {
+              if (flip) {
+                try { flip.flip(storedPos - 1); } catch (e) {}
+              }
+              resumeToast.style.display = 'none';
+            };
+
+            btnResumeStart.onclick = () => {
+              resumeToast.style.display = 'none';
+            };
+
+            setTimeout(() => {
+              resumeToast.style.display = 'none';
+            }, 9000);
+          }
         } catch (err) {
           showError("Unable to Load Flipbook", err.message);
         }
@@ -354,6 +462,8 @@
 
         btnPrev.disabled = currentZeroBased <= 0;
         btnNext.disabled = currentZeroBased >= total - 1;
+
+        saveReadingState(currentPage);
       }
 
       function buildFlipbook(startPageIndex) {

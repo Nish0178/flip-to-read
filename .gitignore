@@ -1,0 +1,9 @@
+target/
+java-app/target/
+storage/
+java-app/storage/
+*.pdf
+*.zip
+__pycache__/
+.DS_Store
+Thumbs.db

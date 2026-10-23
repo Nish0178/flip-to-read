@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Flipbook Reader</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="reader-body">
+
+  <div class="reader-container" id="reader-app">
+
+    <!-- Top Reader Toolbar -->
+    <header class="reader-header" id="reader-header">
+      <div class="reader-header-left">
+        <a href="/" class="btn-nav-home" id="btn-nav-home" aria-label="Back to Upload">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>Home</span>
+        </a>
+
+        <div class="reader-divider"></div>
+        <div class="reader-book-title" id="book-title" title="Flipbook Document">Loading book...</div>
+      </div>
+
+      <!-- Center Page Counter & Jump Popover -->
+      <div class="reader-header-center">
+        <div class="page-jump-wrapper">
+          <button type="button" class="page-counter-badge" id="btn-page-badge" title="Click to jump to a specific page">
+            <span id="page-counter-text">Page ...</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </button>
+          <div class="page-jump-popover" id="page-jump-popover">
+            <label for="jump-input" style="font-size: 0.8rem; color: var(--text-muted);">Go to:</label>
+            <input type="number" id="jump-input" class="page-jump-input" min="1" value="1">
+            <button type="button" class="btn-jump-go" id="btn-jump-go">Go</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Action Toolbar -->
+      <div class="reader-header-right">
+        <!-- Download Dropdown -->
+        <div class="download-dropdown-wrapper">
+          <button type="button" class="btn-toolbar" id="btn-download-menu" title="Download Options" aria-haspopup="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+            </svg>
+            <span>Download</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="margin-left: 2px;">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </button>
+          <div class="download-dropdown-menu" id="download-dropdown-menu" role="menu">
+            <a id="download-pdf-link" class="download-menu-item" href="#" role="menuitem">
+              <div class="download-item-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#E76F51">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>
+                <span>Download PDF</span>
+              </div>
+              <span class="download-badge">PDF</span>
+            </a>
+            <a id="download-html-link" class="download-menu-item" href="#" role="menuitem" title="Download single standalone HTML interactive book">
+              <div class="download-item-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#2A9D8F">
+                  <path d="M19 2H6c-1.2 0-2 .8-2 2v16c0 1.2.8 2 2 2h13c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1zm-1 18H6.5c-.3 0-.5-.2-.5-.5s.2-.5.5-.5H18V20zm0-3H6.5c-.8 0-1.5.7-1.5 1.5V4.5c0-.3.2-.5.5-.5H18v13z"/>
+                </svg>
+                <span>Download Flipbook</span>
+              </div>
+              <span class="download-badge html-badge">HTML</span>
+            </a>
+            <a id="download-zip-link" class="download-menu-item" href="#" role="menuitem">
+              <div class="download-item-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#E76F51">
+                  <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H8v-2h6v2zm4-4H8v-2h10v2z"/>
+                </svg>
+                <span>Download Offline Flipbook</span>
+              </div>
+              <span class="download-badge">ZIP</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Fullscreen Button -->
+        <button type="button" class="btn-toolbar" id="btn-fullscreen" title="Toggle Fullscreen">
+          <svg id="fullscreen-icon" viewBox="0 0 24 24">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
+          <span id="fullscreen-text">Fullscreen</span>
+        </button>
+
+        <!-- New PDF Button -->
+        <a href="/" id="btn-new-pdf" class="btn-toolbar" style="background: var(--accent-light); border-color: var(--accent-border); color: var(--accent);" title="Upload Another PDF">
+          <span>+ New PDF</span>
+        </a>
+
+      </div>
+    </header>
+
+    <!-- Main Viewport (Zero body scroll, auto-fit book stage) -->
+    <main class="reader-viewport" id="reader-viewport">
+      <!-- Loading Overlay -->
+      <div class="reader-overlay" id="loading-overlay">
+        <div class="reader-spinner"></div>
+        <div class="overlay-msg" id="loading-msg">Preparing your flipbook...</div>
+      </div>
+
+      <!-- Error Overlay (Hidden by default) -->
+      <div class="reader-overlay" id="error-overlay" style="display: none;">
+        <div class="reader-error-card">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          <div class="reader-error-title" id="error-title">Flipbook Not Found</div>
+          <div class="reader-error-desc" id="error-desc">We couldn't locate this book. It may have expired or been deleted.</div>
+          <a href="/" class="btn-create" style="margin-top: 10px; text-decoration: none;">Create New Flipbook</a>
+        </div>
+      </div>
+
+      <!-- Center Book Stage -->
+      <div id="book-stage">
+        <div id="book"></div>
+      </div>
+    </main>
+
+    <!-- Bottom Controls Bar -->
+    <footer class="reader-controls-bar" id="reader-controls-bar">
+      <button type="button" class="btn-ctrl" id="btn-prev" aria-label="Previous Page">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Prev</span>
+      </button>
+
+      <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted);" id="bottom-counter">
+        Page 1 / 1
+      </div>
+
+      <button type="button" class="btn-ctrl" id="btn-next" aria-label="Next Page">
+        <span>Next</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+    </footer>
+
+  </div>
+
+  <!-- Local PageFlip Library with CDN Fallback -->
+  <script src="page-flip.browser.js"></script>
+  <script>
+    if (typeof St === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>');
+    }
+  </script>
+
+  <!-- Application Logic -->
+  <script>
+    (function () {
+      const id = new URLSearchParams(window.location.search).get('id');
+
+      const bookTitleEl = document.getElementById('book-title');
+      const pageCounterText = document.getElementById('page-counter-text');
+      const bottomCounter = document.getElementById('bottom-counter');
+      const btnPageBadge = document.getElementById('btn-page-badge');
+      const jumpPopover = document.getElementById('page-jump-popover');
+      const jumpInput = document.getElementById('jump-input');
+      const btnJumpGo = document.getElementById('btn-jump-go');
+
+      const btnDownloadMenu = document.getElementById('btn-download-menu');
+      const downloadDropdown = document.getElementById('download-dropdown-menu');
+      const downloadPdfLink = document.getElementById('download-pdf-link');
+      const downloadHtmlLink = document.getElementById('download-html-link');
+      const downloadZipLink = document.getElementById('download-zip-link');
+
+      const btnFullscreen = document.getElementById('btn-fullscreen');
+      const fullscreenText = document.getElementById('fullscreen-text');
+
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+
+      const viewportEl = document.getElementById('reader-viewport');
+      const bookStageEl = document.getElementById('book-stage');
+      const loadingOverlay = document.getElementById('loading-overlay');
+      const errorOverlay = document.getElementById('error-overlay');
+      const errorTitle = document.getElementById('error-title');
+      const errorDesc = document.getElementById('error-desc');
+
+      let flip = null;
+      let bookMeta = null;
+      let isInitialized = false;
+
+      // Handle Missing ID immediately
+      if (!id || !/^[a-f0-9]{12}$/.test(id)) {
+        showError("Invalid Flipbook ID", "No valid flipbook identifier was provided. Please upload a PDF to create one.");
+        return;
+      }
+
+      // Configure download links
+      downloadPdfLink.href = '/api/books/' + encodeURIComponent(id) + '/pdf';
+      downloadHtmlLink.href = '/api/books/' + encodeURIComponent(id) + '/flipbook';
+      downloadZipLink.href = '/api/books/' + encodeURIComponent(id) + '/download';
+
+      // Download dropdown toggling
+      btnDownloadMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        downloadDropdown.classList.toggle('active');
+        jumpPopover.classList.remove('active');
+      });
+
+      // Jump Popover toggling
+      btnPageBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        jumpPopover.classList.toggle('active');
+        downloadDropdown.classList.remove('active');
+        if (jumpPopover.classList.contains('active')) {
+          jumpInput.focus();
+          jumpInput.select();
+        }
+      });
+
+      // Close popups on document click
+      document.addEventListener('click', () => {
+        downloadDropdown.classList.remove('active');
+        jumpPopover.classList.remove('active');
+      });
+
+      // Navigation actions
+      const btnHome = document.getElementById('btn-nav-home');
+      if (btnHome) {
+        btnHome.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.location.href = '/';
+        });
+      }
+
+      const btnNewPdf = document.getElementById('btn-new-pdf');
+      if (btnNewPdf) {
+        btnNewPdf.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.location.href = '/';
+        });
+      }
+
+      // Jump to page action
+      btnJumpGo.addEventListener('click', performPageJump);
+
+      jumpInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') performPageJump();
+      });
+
+      function performPageJump() {
+        if (!flip || !bookMeta) return;
+        const pageNum = parseInt(jumpInput.value, 10);
+        if (isNaN(pageNum) || pageNum < 1 || pageNum > bookMeta.pages) {
+          jumpInput.style.borderColor = 'var(--danger)';
+          setTimeout(() => jumpInput.style.borderColor = '', 1000);
+          return;
+        }
+        flip.flip(pageNum - 1);
+        jumpPopover.classList.remove('active');
+      }
+
+      // Initialize reader
+      async function init() {
+        try {
+          const res = await fetch('/api/books/' + encodeURIComponent(id));
+          if (!res.ok) {
+            throw new Error("This flipbook could not be found or has expired.");
+          }
+          bookMeta = await res.json();
+
+          if (!bookMeta || !bookMeta.pages || bookMeta.pages < 1) {
+            throw new Error("This book contains no readable pages.");
+          }
+
+          // Document title
+          const title = bookMeta.title || bookMeta.filename || "Flipbook";
+          bookTitleEl.textContent = title;
+          bookTitleEl.title = title;
+          document.title = title + " — FlipBook Reader";
+
+          jumpInput.max = bookMeta.pages;
+
+          buildFlipbook(0);
+        } catch (err) {
+          showError("Unable to Load Flipbook", err.message);
+        }
+      }
+
+      /**
+       * Calculates viewport constraints dynamically.
+       * ZERO body scrolling: fits within viewport clientWidth & clientHeight.
+       */
+      function calculateDimensions() {
+        // Leave comfortable padding around the book stage
+        const availW = Math.max(280, viewportEl.clientWidth - 32);
+        const availH = Math.max(260, viewportEl.clientHeight - 24);
+
+        const isMobile = window.innerWidth < 768 || availW < availH * 1.05;
+        const origW = (bookMeta && bookMeta.width > 0) ? bookMeta.width : 600;
+        const origH = (bookMeta && bookMeta.height > 0) ? bookMeta.height : 800;
+        const aspect = origW / origH;
+
+        let pageW, pageH;
+
+        if (isMobile) {
+          // Single-page mode
+          let targetW = Math.min(availW, 680);
+          let targetH = targetW / aspect;
+          if (targetH > availH) {
+            targetH = availH;
+            targetW = targetH * aspect;
+          }
+          pageW = Math.round(targetW);
+          pageH = Math.round(targetH);
+        } else {
+          // Two-page spread mode
+          let targetSpreadW = Math.min(availW, 1500);
+          let targetPageW = targetSpreadW / 2;
+          let targetH = targetPageW / aspect;
+          if (targetH > availH) {
+            targetH = availH;
+            targetPageW = targetH * aspect;
+          }
+          pageW = Math.round(targetPageW);
+          pageH = Math.round(targetH);
+        }
+
+        return {
+          width: Math.max(160, pageW),
+          height: Math.max(220, pageH),
+          isMobile: isMobile
+        };
+      }
+
+      function updateCounter() {
+        if (!flip || !bookMeta) return;
+        const currentZeroBased = flip.getCurrentPageIndex() || 0;
+        const currentPage = currentZeroBased + 1;
+        const total = bookMeta.pages;
+
+        const text = `Page ${currentPage} / ${total}`;
+        pageCounterText.textContent = text;
+        bottomCounter.textContent = text;
+        jumpInput.value = currentPage;
+
+        btnPrev.disabled = currentZeroBased <= 0;
+        btnNext.disabled = currentZeroBased >= total - 1;
+      }
+
+      function buildFlipbook(startPageIndex) {
+        if (typeof St === 'undefined' || !St.PageFlip) {
+          showError("Library Error", "The page-flip library could not be initialized.");
+          return;
+        }
+
+        const dims = calculateDimensions();
+        bookStageEl.innerHTML = '<div id="book"></div>';
+        const bookEl = document.getElementById('book');
+
+        flip = new St.PageFlip(bookEl, {
+          width: dims.width,
+          height: dims.height,
+          size: 'fixed',
+          showCover: true,
+          usePortrait: dims.isMobile,
+          maxShadowOpacity: 0.55,
+          mobileScrollSupport: false
+        });
+
+        const pages = Array.from({ length: bookMeta.pages }, (_, i) => `/books/${id}/page-${i + 1}.jpg`);
+        flip.loadFromImages(pages);
+
+        flip.on('flip', updateCounter);
+        flip.on('init', () => {
+          updateCounter();
+          if (startPageIndex > 0) {
+            try { flip.flip(startPageIndex); } catch (e) {}
+          }
+          loadingOverlay.classList.add('hidden');
+          setTimeout(() => loadingOverlay.style.display = 'none', 350);
+          isInitialized = true;
+        });
+
+        // Navigation button events
+        btnPrev.onclick = () => flip.flipPrev();
+        btnNext.onclick = () => flip.flipNext();
+      }
+
+      // Keyboard navigation
+      window.addEventListener('keydown', (e) => {
+        if (!flip || !isInitialized) return;
+        if (document.activeElement === jumpInput) return;
+
+        if (e.key === 'ArrowLeft') {
+          flip.flipPrev();
+        } else if (e.key === 'ArrowRight') {
+          flip.flipNext();
+        } else if (e.key === 'Home') {
+          flip.flip(0);
+        } else if (e.key === 'End' && bookMeta) {
+          flip.flip(bookMeta.pages - 1);
+        }
+      });
+
+      // Fullscreen handling
+      btnFullscreen.addEventListener('click', toggleFullscreen);
+
+      function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+
+      document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+          fullscreenText.textContent = 'Exit';
+        } else {
+          fullscreenText.textContent = 'Fullscreen';
+        }
+        recalcAndResize();
+      });
+
+      // Dynamic resize handling with debouncing
+      let resizeTimeout = null;
+      function recalcAndResize() {
+        if (!flip || !bookMeta || !isInitialized) return;
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          const current = flip.getCurrentPageIndex() || 0;
+          try { flip.destroy(); } catch (e) {}
+          buildFlipbook(current);
+        }, 180);
+      }
+
+      window.addEventListener('resize', recalcAndResize);
+      window.addEventListener('orientationchange', recalcAndResize);
+
+      if (window.ResizeObserver) {
+        const ro = new ResizeObserver(() => {
+          if (isInitialized) recalcAndResize();
+        });
+        ro.observe(viewportEl);
+      }
+
+      function showError(title, message) {
+        loadingOverlay.style.display = 'none';
+        errorTitle.textContent = title;
+        errorDesc.textContent = message;
+        errorOverlay.style.display = 'flex';
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

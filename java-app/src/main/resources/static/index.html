@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlipBook — Turn PDFs Into Interactive Flipbooks</title>
+  <meta name="description" content="Upload any PDF and transform it into a realistic, interactive page-turning flipbook with fullscreen reading and offline download.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="landing-body">
+
+  <!-- Header -->
+  <header class="site-header">
+    <a href="/" class="brand-logo" aria-label="FlipBook Home">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M19 2H6c-1.2 0-2 .8-2 2v16c0 1.2.8 2 2 2h13c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1zm-1 18H6.5c-.3 0-.5-.2-.5-.5s.2-.5.5-.5H18V20zm0-3H6.5c-.8 0-1.5.7-1.5 1.5V4.5c0-.3.2-.5.5-.5H18v13z"/>
+        </svg>
+      </div>
+      <div class="brand-info">
+        <span class="brand-name">FlipBook</span>
+        <span class="brand-tagline">Transform PDFs into interactive books</span>
+      </div>
+    </a>
+    <span class="header-badge">v1.0 &bull; Fast &amp; Secure</span>
+  </header>
+
+  <!-- Main Content -->
+  <main class="landing-main">
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-pill">
+        <span>✨ Modern Digital Publishing</span>
+      </div>
+      <h1 class="hero-title">
+        Turn Your PDFs Into<br>
+        <span class="gradient-text">Interactive Flipbooks</span>
+      </h1>
+      <p class="hero-subtitle">
+        Upload a PDF and experience it like a real book — with realistic page turns, fullscreen reading, and offline download.
+      </p>
+    </section>
+
+    <!-- Upload Card -->
+    <div class="upload-card">
+
+      <!-- Drag & Drop Zone -->
+      <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Upload PDF Area">
+        <div class="drop-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="drop-title">Drop your PDF here</div>
+          <div class="drop-subtitle">or <span style="color: var(--accent); font-weight: 600;">browse from your computer</span></div>
+        </div>
+        <div class="drop-limit">Maximum file size: 50 MB</div>
+        <input type="file" id="file-input" accept="application/pdf,.pdf" style="display: none;" aria-hidden="true">
+      </div>
+
+      <!-- File Preview (Visible after selecting a file) -->
+      <div class="file-preview" id="file-preview">
+        <div class="file-preview-left">
+          <div class="file-badge-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9.5 8.5h-2v-1h2c.28 0 .5-.22.5-.5v-1c0-.28-.22-.5-.5-.5h-3v5h1.5v-1h1.5c.28 0 .5-.22.5-.5v-1c0-.28-.22-.5-.5-.5zm5 2h-1.5v-5H14c.83 0 1.5.67 1.5 1.5v2c0 .83-.67 1.5-1.5 1.5zm-5-3.5h-1v-1h1v1zm3.5 2.5v-3h-.5v3h.5zm5.5-2.5h-1.5v-1.5H19V7h-3v5h1.5v-1.5H18v-1.5z"/>
+            </svg>
+          </div>
+          <div class="file-details">
+            <span class="file-name" id="preview-filename">document.pdf</span>
+            <span class="file-size" id="preview-filesize">0 KB</span>
+          </div>
+        </div>
+        <button type="button" class="btn-change-file" id="btn-change-file">Change File</button>
+      </div>
+
+      <!-- Action Button Area -->
+      <div class="action-area" id="action-area" style="display: none;">
+        <button type="button" class="btn-create" id="btn-create">
+          <span>Create Flipbook</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Progress / Loading State -->
+      <div class="conversion-progress" id="conversion-progress">
+        <div class="progress-header">
+          <div class="progress-spinner"></div>
+          <span class="progress-step-text" id="progress-text">Uploading PDF...</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-indeterminate"></div>
+        </div>
+      </div>
+
+      <!-- Error Alert -->
+      <div class="error-alert" id="error-alert">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        </svg>
+        <span id="error-message">An error occurred while uploading.</span>
+      </div>
+
+    </div>
+
+    <!-- How It Works Section -->
+    <section class="info-section">
+      <div class="section-label">How It Works</div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <div class="step-title">Upload PDF</div>
+          <div class="step-desc">Select any PDF document up to 50 MB from your computer.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <div class="step-title">Instant Conversion</div>
+          <div class="step-desc">High-fidelity page rendering with PyMuPDF preserves crisp text and imagery.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <div class="step-title">Read &amp; Download</div>
+          <div class="step-desc">Enjoy realistic page turns or download a 100% offline flipbook package.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="info-section" style="margin-top: 36px;">
+      <div class="section-label">Key Features</div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-title">📖 Realistic Page Turns</div>
+          <div class="step-desc">Smooth physics-based page curl, realistic center spine, and depth shadows.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-title">🖥️ Viewport-Fit Reader</div>
+          <div class="step-desc">Full application layout without vertical page scrolling. Fits desktop and mobile screens.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-title">📦 Offline Flipbook (.zip)</div>
+          <div class="step-desc">Download a standalone flipbook that opens offline with zero server dependencies.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      &copy; 2026 FlipBook &bull; Professional PDF Publishing Engine
+    </footer>
+
+  </main>
+
+  <script>
+    (function () {
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('file-input');
+      const filePreview = document.getElementById('file-preview');
+      const previewFilename = document.getElementById('preview-filename');
+      const previewFilesize = document.getElementById('preview-filesize');
+      const btnChangeFile = document.getElementById('btn-change-file');
+      const actionArea = document.getElementById('action-area');
+      const btnCreate = document.getElementById('btn-create');
+      const progressBox = document.getElementById('conversion-progress');
+      const progressText = document.getElementById('progress-text');
+      const errorAlert = document.getElementById('error-alert');
+      const errorMessage = document.getElementById('error-message');
+
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+      let selectedFile = null;
+      let stepInterval = null;
+
+      // Click to choose file
+      dropZone.addEventListener('click', () => fileInput.click());
+      btnChangeFile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.click();
+      });
+
+      // Keyboard access
+      dropZone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      // File input change
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files && fileInput.files[0]) {
+          handleFileSelect(fileInput.files[0]);
+        }
+      });
+
+      // Drag and Drop listeners
+      ['dragenter', 'dragover'].forEach(name => {
+        dropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(name => {
+        dropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.remove('dragover');
+        });
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files[0]) {
+          handleFileSelect(dt.files[0]);
+        }
+      });
+
+      function handleFileSelect(file) {
+        clearError();
+
+        // Validate PDF extension
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+          showError("Please select a valid PDF file (.pdf).");
+          return;
+        }
+
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+          showError("File is too large (" + formatFileSize(file.size) + "). Maximum allowed size is 50 MB.");
+          return;
+        }
+
+        selectedFile = file;
+
+        // Show file preview
+        previewFilename.textContent = file.name;
+        previewFilesize.textContent = formatFileSize(file.size);
+        filePreview.classList.add('active');
+        actionArea.style.display = 'flex';
+        dropZone.style.display = 'none';
+      }
+
+      btnCreate.addEventListener('click', startUpload);
+
+      async function startUpload() {
+        if (!selectedFile) return;
+
+        clearError();
+        btnCreate.disabled = true;
+        btnChangeFile.disabled = true;
+        progressBox.classList.add('active');
+
+        // Animated stepped progress messages
+        const steps = [
+          "Uploading PDF...",
+          "Preparing pages...",
+          "Rendering flipbook with PyMuPDF...",
+          "Generating page textures...",
+          "Almost ready..."
+        ];
+        let stepIdx = 0;
+        progressText.textContent = steps[0];
+        stepInterval = setInterval(() => {
+          stepIdx = (stepIdx + 1) % steps.length;
+          progressText.textContent = steps[stepIdx];
+        }, 2200);
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await res.json().catch(() => ({}));
+          clearInterval(stepInterval);
+
+          if (!res.ok) {
+            throw new Error(data.error || 'Conversion failed. Please try again.');
+          }
+
+          progressText.textContent = "Redirecting to your flipbook...";
+          window.location.href = '/flipbook.html?id=' + encodeURIComponent(data.id);
+        } catch (err) {
+          clearInterval(stepInterval);
+          progressBox.classList.remove('active');
+          btnCreate.disabled = false;
+          btnChangeFile.disabled = false;
+          showError(err.message || "Failed to create flipbook. Please try again.");
+        }
+      }
+
+      function showError(msg) {
+        errorMessage.textContent = msg;
+        errorAlert.classList.add('active');
+      }
+
+      function clearError() {
+        errorMessage.textContent = '';
+        errorAlert.classList.remove('active');
+      }
+
+      function formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      }
+    })();
+  </script>
+</body>
+</html>

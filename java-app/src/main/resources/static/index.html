@@ -3,26 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FlipBook — Turn PDFs Into Interactive Flipbooks</title>
-  <meta name="description" content="Upload any PDF and transform it into a realistic, interactive page-turning flipbook with fullscreen reading and offline download.">
+  <title>Flip to Read — PDF Flipbook Platform</title>
+  <meta name="description" content="Turn PDFs into an immersive reading experience. Realistic page turns, zero scrolling, standalone interactive HTML download, and companion browser extension.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="logo-icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="landing-body">
 
   <!-- Header -->
   <header class="site-header">
-    <a href="/" class="brand-logo" aria-label="FlipBook Home">
-      <div class="brand-icon">
-        <svg viewBox="0 0 24 24">
-          <path d="M19 2H6c-1.2 0-2 .8-2 2v16c0 1.2.8 2 2 2h13c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1zm-1 18H6.5c-.3 0-.5-.2-.5-.5s.2-.5.5-.5H18V20zm0-3H6.5c-.8 0-1.5.7-1.5 1.5V4.5c0-.3.2-.5.5-.5H18v13z"/>
-        </svg>
-      </div>
+    <a href="/" class="brand-logo" aria-label="Flip to Read Home">
+      <img src="logo-icon.png" alt="Flip to Read" class="brand-icon-img">
       <div class="brand-info">
-        <span class="brand-name">FlipBook</span>
-        <span class="brand-tagline">Transform PDFs into interactive books</span>
+        <span class="brand-name">
+          <span class="brand-flip">Flip</span>
+          <span class="brand-to">to</span>
+          <span class="brand-read">Read</span>
+        </span>
+        <span class="brand-tagline">Turn PDFs into an immersive reading experience</span>
       </div>
     </a>
-    <span class="header-badge">v1.0 &bull; Fast &amp; Secure</span>
+
+    <div class="site-nav">
+      <button type="button" class="btn-extension-badge" id="btn-get-extension" title="Install Chrome/Edge Extension">
+        <span>🧩</span>
+        <span>Get Extension</span>
+      </button>
+    </div>
   </header>
 
   <!-- Main Content -->
@@ -31,19 +39,52 @@
     <!-- Hero Section -->
     <section class="hero-section">
       <div class="hero-pill">
-        <span>✨ Modern Digital Publishing</span>
+        <span>✨ Modern PDF Publishing &amp; Reading Engine</span>
       </div>
       <h1 class="hero-title">
-        Turn Your PDFs Into<br>
-        <span class="gradient-text">Interactive Flipbooks</span>
+        Turn PDFs Into An<br>
+        <span class="gradient-text">Immersive Reading Experience</span>
       </h1>
       <p class="hero-subtitle">
-        Upload a PDF and experience it like a real book — with realistic page turns, fullscreen reading, and offline download.
+        Transform static documents into realistic interactive flipbooks with physics-based page turns, dual-page spreads, offline standalone downloads, and our instant browser extension.
       </p>
     </section>
 
     <!-- Upload Card -->
-    <div class="upload-card">
+    <div class="upload-card" id="upload-card">
+
+      <!-- 6-Step Visual Pipeline -->
+      <div class="upload-stepper" id="upload-stepper">
+        <div class="stepper-step active" id="step-1">
+          <div class="step-circle">1</div>
+          <div class="step-name">Select PDF</div>
+        </div>
+        <div class="stepper-line"></div>
+        <div class="stepper-step" id="step-2">
+          <div class="step-circle">2</div>
+          <div class="step-name">Preview</div>
+        </div>
+        <div class="stepper-line"></div>
+        <div class="stepper-step" id="step-3">
+          <div class="step-circle">3</div>
+          <div class="step-name">Validate</div>
+        </div>
+        <div class="stepper-line"></div>
+        <div class="stepper-step" id="step-4">
+          <div class="step-circle">4</div>
+          <div class="step-name">Upload</div>
+        </div>
+        <div class="stepper-line"></div>
+        <div class="stepper-step" id="step-5">
+          <div class="step-circle">5</div>
+          <div class="step-name">Convert</div>
+        </div>
+        <div class="stepper-line"></div>
+        <div class="stepper-step" id="step-6">
+          <div class="step-circle">6</div>
+          <div class="step-name">Flipbook</div>
+        </div>
+      </div>
 
       <!-- Drag & Drop Zone -->
       <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Upload PDF Area">
@@ -56,7 +97,7 @@
           <div class="drop-title">Drop your PDF here</div>
           <div class="drop-subtitle">or <span style="color: var(--accent); font-weight: 600;">browse from your computer</span></div>
         </div>
-        <div class="drop-limit">Maximum file size: 50 MB</div>
+        <div class="drop-limit">Maximum file size: 50 MB &bull; PDF documents only</div>
         <input type="file" id="file-input" accept="application/pdf,.pdf" style="display: none;" aria-hidden="true">
       </div>
 
@@ -108,53 +149,155 @@
 
     </div>
 
+    <!-- Recent Books Shelf -->
+    <section class="recent-section" id="recent-section">
+      <div class="section-header-row">
+        <div class="section-label" style="margin-bottom: 0;">Recent Books</div>
+        <button type="button" id="btn-clear-recent" style="background:none; border:none; color:var(--text-dim); font-size:0.78rem; cursor:pointer; text-decoration:underline;">Clear History</button>
+      </div>
+      <div class="recent-grid" id="recent-grid">
+        <!-- Rendered via JavaScript from localStorage -->
+      </div>
+    </section>
+
     <!-- How It Works Section -->
-    <section class="info-section">
+    <section class="info-section" style="margin-top: 48px;">
       <div class="section-label">How It Works</div>
       <div class="steps-grid">
         <div class="step-card">
           <div class="step-number">1</div>
-          <div class="step-title">Upload PDF</div>
-          <div class="step-desc">Select any PDF document up to 50 MB from your computer.</div>
+          <div class="step-title">Select or Detect PDF</div>
+          <div class="step-desc">Upload a PDF directly from your computer or detect any online PDF instantly with our browser extension.</div>
         </div>
         <div class="step-card">
           <div class="step-number">2</div>
-          <div class="step-title">Instant Conversion</div>
-          <div class="step-desc">High-fidelity page rendering with PyMuPDF preserves crisp text and imagery.</div>
+          <div class="step-title">Server PyMuPDF Conversion</div>
+          <div class="step-desc">High-precision vector rasterization processes crisp textures, retains aspect ratio, and prepares 3D flipbook assets.</div>
         </div>
         <div class="step-card">
           <div class="step-number">3</div>
-          <div class="step-title">Read &amp; Download</div>
-          <div class="step-desc">Enjoy realistic page turns or download a 100% offline flipbook package.</div>
+          <div class="step-title">Read, Resume &amp; Download</div>
+          <div class="step-desc">Read seamlessly with physics-based page curl, continue where you left off, or download single-file standalone flipbooks.</div>
         </div>
       </div>
     </section>
 
     <!-- Features Section -->
-    <section class="info-section" style="margin-top: 36px;">
-      <div class="section-label">Key Features</div>
+    <section class="info-section" style="margin-top: 40px;">
+      <div class="section-label">Key Platform Features</div>
       <div class="steps-grid">
         <div class="step-card">
           <div class="step-title">📖 Realistic Page Turns</div>
-          <div class="step-desc">Smooth physics-based page curl, realistic center spine, and depth shadows.</div>
+          <div class="step-desc">Smooth page curl with dynamic lighting, paper thickness, book spine depth, and realistic corner dragging.</div>
         </div>
         <div class="step-card">
           <div class="step-title">🖥️ Viewport-Fit Reader</div>
-          <div class="step-desc">Full application layout without vertical page scrolling. Fits desktop and mobile screens.</div>
+          <div class="step-desc">Full application layout without vertical page scrolling. Automatically switches to two-page spread or mobile single-page.</div>
         </div>
         <div class="step-card">
-          <div class="step-title">📦 Offline Flipbook (.zip)</div>
-          <div class="step-desc">Download a standalone flipbook that opens offline with zero server dependencies.</div>
+          <div class="step-title">💾 Single-File Standalone HTML</div>
+          <div class="step-desc">Download a genuine 1-file standalone flipbook with embedded PDF.js and vector PDF. Zero server, 0 CDN, works on file:///.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-title">📦 Complete Offline ZIP</div>
+          <div class="step-desc">Download an offline package with all page assets and library files to keep your interactive flipbook forever.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-title">🧩 Browser Extension</div>
+          <div class="step-desc">Detect online PDFs on any website or right-click to "Open PDF with Flip to Read" without downloading first.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-title">🔖 Reading Position Memory</div>
+          <div class="step-desc">Automatically saves your reading position so you can pick up exactly where you stopped.</div>
         </div>
       </div>
     </section>
 
+    <!-- Benefits Section -->
+    <section class="info-section" style="margin-top: 40px;">
+      <div class="section-label">Built For Readers &amp; Creators</div>
+      <div class="benefits-grid">
+        <div class="benefit-card">
+          <span class="benefit-role">Students &amp; Researchers</span>
+          <div class="benefit-title">Effortless Document Reading</div>
+          <div class="benefit-desc">Navigate heavy textbooks, research papers, and lecture slides with intuitive keyboard shortcuts and page jumping.</div>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-role">Publishers &amp; Authors</span>
+          <div class="benefit-title">Captivating Digital Editions</div>
+          <div class="benefit-desc">Present magazines, catalogs, brochures, and ebooks in an engaging, tactile digital format readers will love.</div>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-role">Businesses &amp; Teams</span>
+          <div class="benefit-title">Interactive Reports &amp; Decks</div>
+          <div class="benefit-desc">Share standalone flipbooks with clients and stakeholders that open instantly in any web browser without extra software.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Call to Action Banner -->
+    <div class="cta-banner">
+      <h2 class="cta-title">Ready to Transform Your Reading?</h2>
+      <p class="cta-desc">Upload your PDF now and turn it into an engaging flipbook in under ten seconds.</p>
+      <button type="button" class="btn-create" id="btn-cta-create" style="margin-top: 4px;">
+        <span>Create Flipbook</span>
+      </button>
+    </div>
+
     <!-- Footer -->
-    <footer class="site-footer">
-      &copy; 2026 FlipBook &bull; Professional PDF Publishing Engine
+    <footer class="site-footer" style="margin-top: 48px;">
+      <div style="font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
+        <span style="color:#264653;">Flip</span> <span style="color:#64748b;">to</span> <span style="color:#E76F51;">Read</span>
+      </div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 8px;">
+        Turn PDFs into an immersive reading experience.
+      </div>
+      <div style="font-size: 0.76rem; color: var(--text-dim);">
+        &copy; 2026 Flip to Read &bull; Powered by Java 21, Spring Boot, PyMuPDF &amp; PageFlip
+      </div>
     </footer>
 
   </main>
+
+  <!-- Extension Install Modal -->
+  <div class="modal-backdrop" id="extension-modal">
+    <div class="modal-box">
+      <button type="button" class="modal-close" id="btn-close-modal" aria-label="Close modal">&times;</button>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.8rem;">🧩</span>
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-main);">Install Flip to Read Extension</h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Chrome &bull; Edge &bull; Brave &bull; Opera</span>
+        </div>
+      </div>
+      <div style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
+        The Flip to Read browser extension lets you detect online PDFs, convert them with one click, and read them with realistic page flips.
+      </div>
+      <div class="install-step-list">
+        <div class="install-step-item">
+          <div class="install-step-num">1</div>
+          <div>Build the extension using <code>npm run build</code> in the <code>extension/</code> directory.</div>
+        </div>
+        <div class="install-step-item">
+          <div class="install-step-num">2</div>
+          <div>Open <code>chrome://extensions</code> or <code>edge://extensions</code> in your browser.</div>
+        </div>
+        <div class="install-step-item">
+          <div class="install-step-num">3</div>
+          <div>Turn on <strong>Developer mode</strong> in the top-right corner.</div>
+        </div>
+        <div class="install-step-item">
+          <div class="install-step-num">4</div>
+          <div>Click <strong>Load unpacked</strong> and select the <code>extension/dist</code> folder.</div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+        <button type="button" class="btn-create" id="btn-modal-got-it" style="padding: 8px 18px; font-size: 0.86rem;">
+          Got it
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script>
     (function () {
@@ -166,14 +309,46 @@
       const btnChangeFile = document.getElementById('btn-change-file');
       const actionArea = document.getElementById('action-area');
       const btnCreate = document.getElementById('btn-create');
+      const btnCtaCreate = document.getElementById('btn-cta-create');
       const progressBox = document.getElementById('conversion-progress');
       const progressText = document.getElementById('progress-text');
       const errorAlert = document.getElementById('error-alert');
       const errorMessage = document.getElementById('error-message');
 
+      const recentSection = document.getElementById('recent-section');
+      const recentGrid = document.getElementById('recent-grid');
+      const btnClearRecent = document.getElementById('btn-clear-recent');
+
+      const btnGetExtension = document.getElementById('btn-get-extension');
+      const extensionModal = document.getElementById('extension-modal');
+      const btnCloseModal = document.getElementById('btn-close-modal');
+      const btnModalGotIt = document.getElementById('btn-modal-got-it');
+
       const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
       let selectedFile = null;
       let stepInterval = null;
+
+      // Modal handlers
+      btnGetExtension.addEventListener('click', () => extensionModal.classList.add('active'));
+      btnCloseModal.addEventListener('click', () => extensionModal.classList.remove('active'));
+      btnModalGotIt.addEventListener('click', () => extensionModal.classList.remove('active'));
+      extensionModal.addEventListener('click', (e) => {
+        if (e.target === extensionModal) extensionModal.classList.remove('active');
+      });
+
+      // Stepper helper
+      function setStepper(stepNumber) {
+        for (let i = 1; i <= 6; i++) {
+          const el = document.getElementById('step-' + i);
+          if (!el) continue;
+          el.classList.remove('active', 'completed');
+          if (i < stepNumber) {
+            el.classList.add('completed');
+          } else if (i === stepNumber) {
+            el.classList.add('active');
+          }
+        }
+      }
 
       // Click to choose file
       dropZone.addEventListener('click', () => fileInput.click());
@@ -181,6 +356,13 @@
         e.stopPropagation();
         fileInput.click();
       });
+
+      if (btnCtaCreate) {
+        btnCtaCreate.addEventListener('click', () => {
+          document.getElementById('upload-card').scrollIntoView({ behavior: 'smooth' });
+          if (!selectedFile) fileInput.click();
+        });
+      }
 
       // Keyboard access
       dropZone.addEventListener('keydown', (e) => {
@@ -223,20 +405,24 @@
 
       function handleFileSelect(file) {
         clearError();
+        setStepper(2); // Preview
 
         // Validate PDF extension
         if (!file.name.toLowerCase().endsWith('.pdf')) {
+          setStepper(3);
           showError("Please select a valid PDF file (.pdf).");
           return;
         }
 
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
+          setStepper(3);
           showError("File is too large (" + formatFileSize(file.size) + "). Maximum allowed size is 50 MB.");
           return;
         }
 
         selectedFile = file;
+        setStepper(3); // Validated
 
         // Show file preview
         previewFilename.textContent = file.name;
@@ -255,20 +441,22 @@
         btnCreate.disabled = true;
         btnChangeFile.disabled = true;
         progressBox.classList.add('active');
+        setStepper(4); // Uploading
 
-        // Animated stepped progress messages
+        // Stepped progress messages
         const steps = [
-          "Uploading PDF...",
-          "Preparing pages...",
-          "Rendering flipbook with PyMuPDF...",
-          "Generating page textures...",
-          "Almost ready..."
+          { msg: "Uploading PDF to Flip to Read...", step: 4 },
+          { msg: "Rasterizing pages with PyMuPDF...", step: 5 },
+          { msg: "Generating page textures & dimensions...", step: 5 },
+          { msg: "Preparing realistic flipbook...", step: 5 },
+          { msg: "Opening reader...", step: 6 }
         ];
         let stepIdx = 0;
-        progressText.textContent = steps[0];
+        progressText.textContent = steps[0].msg;
         stepInterval = setInterval(() => {
           stepIdx = (stepIdx + 1) % steps.length;
-          progressText.textContent = steps[stepIdx];
+          progressText.textContent = steps[stepIdx].msg;
+          setStepper(steps[stepIdx].step);
         }, 2200);
 
         const formData = new FormData();
@@ -287,13 +475,25 @@
             throw new Error(data.error || 'Conversion failed. Please try again.');
           }
 
+          setStepper(6); // Open Flipbook
           progressText.textContent = "Redirecting to your flipbook...";
+
+          // Save to local recent books history
+          saveToRecentBooks({
+            id: data.id,
+            title: data.title || selectedFile.name.replace(/\.[^/.]+$/, ""),
+            pages: data.pages || 1,
+            lastPage: 1,
+            timestamp: Date.now()
+          });
+
           window.location.href = '/flipbook.html?id=' + encodeURIComponent(data.id);
         } catch (err) {
           clearInterval(stepInterval);
           progressBox.classList.remove('active');
           btnCreate.disabled = false;
           btnChangeFile.disabled = false;
+          setStepper(3);
           showError(err.message || "Failed to create flipbook. Please try again.");
         }
       }
@@ -315,6 +515,93 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
       }
+
+      // Recent Books Logic (localStorage)
+      function loadRecentBooks() {
+        try {
+          const raw = localStorage.getItem('flip_recent_books');
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function saveToRecentBooks(entry) {
+        try {
+          let list = loadRecentBooks();
+          list = list.filter(item => item.id !== entry.id);
+          list.unshift(entry);
+          if (list.length > 8) list = list.slice(0, 8);
+          localStorage.setItem('flip_recent_books', JSON.stringify(list));
+        } catch (e) {}
+      }
+
+      function renderRecentBooks() {
+        const list = loadRecentBooks();
+        if (!list || list.length === 0) {
+          recentGrid.innerHTML = `
+            <div class="recent-empty-state" style="grid-column: 1 / -1;">
+              📖 No recent books yet. Upload a PDF or use our extension to start reading.
+            </div>
+          `;
+          btnClearRecent.style.display = 'none';
+          return;
+        }
+
+        btnClearRecent.style.display = 'inline-block';
+        recentGrid.innerHTML = list.map(item => {
+          const lastPage = localStorage.getItem('flip_pos_' + item.id) || item.lastPage || 1;
+          const totalPages = item.pages || 1;
+          const displayTitle = item.title || "Untitled Book";
+          return `
+            <div class="recent-card">
+              <div class="recent-card-top">
+                <div class="recent-card-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/>
+                  </svg>
+                </div>
+                <div class="recent-card-title" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
+              </div>
+              <div class="recent-card-meta">
+                <span>Page ${lastPage} / ${totalPages}</span>
+                <span>${formatTimeAgo(item.timestamp)}</span>
+              </div>
+              <a href="/flipbook.html?id=${encodeURIComponent(item.id)}" class="recent-card-btn">
+                <span>Continue Reading</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </a>
+            </div>
+          `;
+        }).join('');
+      }
+
+      btnClearRecent.addEventListener('click', () => {
+        if (confirm("Clear your local reading history?")) {
+          localStorage.removeItem('flip_recent_books');
+          renderRecentBooks();
+        }
+      });
+
+      function escapeHtml(str) {
+        return (str || '').replace(/[&<>'"]/g, tag => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[tag] || tag));
+      }
+
+      function formatTimeAgo(ts) {
+        if (!ts) return 'Recently';
+        const diff = (Date.now() - ts) / 1000;
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        return Math.floor(diff / 86400) + 'd ago';
+      }
+
+      // Initial render
+      renderRecentBooks();
     })();
   </script>
 </body>

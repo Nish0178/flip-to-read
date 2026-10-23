@@ -3,6 +3,11 @@ package com.flipbook;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -16,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -477,7 +483,7 @@ public class ConverterService {
              + "<head>\n"
              + "  <meta charset=\"UTF-8\">\n"
              + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n"
-             + "  <title>" + escapeHtml(title) + " - Offline Flipbook</title>\n"
+             + "  <title>" + escapeHtml(title) + " — Flip to Read</title>\n"
              + "  <style>\n"
              + "    * { box-sizing: border-box; margin: 0; padding: 0; }\n"
              + "    html, body {\n"
@@ -548,7 +554,7 @@ public class ConverterService {
              + "  <div class=\"app\">\n"
              + "    <header>\n"
              + "      <div class=\"title-area\">\n"
-             + "        <span class=\"badge\">Offline Flipbook</span>\n"
+             + "        <span class=\"badge\"><span style=\"color:#264653;\">Flip</span> <span style=\"color:#64748b;\">to</span> <span style=\"color:#E76F51;\">Read</span></span>\n"
              + "        <span class=\"book-title\" title=\"" + escapeHtml(title) + "\">" + escapeHtml(title) + "</span>\n"
              + "      </div>\n"
              + "    </header>\n"
@@ -681,6 +687,210 @@ public class ConverterService {
         byte[] head = file.getInputStream().readNBytes(5);
         if (!new String(head, StandardCharsets.US_ASCII).startsWith("%PDF")) {
             throw new IOException("This file is not a valid PDF.");
+        }
+    }
+
+    private static final long MAX_PDF_BYTES = 50L * 1024 * 1024; // 50 MB
+    private static final Pattern FILENAME_FROM_DISP = Pattern.compile("filename\\*?=(?:UTF-8'')?[\"']?([^\"';\\n]+)[\"']?", Pattern.CASE_INSENSITIVE);
+
+    public String convertFromUrl(String urlStr) throws IOException, InterruptedException {
+        if (urlStr == null || urlStr.isBlank()) {
+            throw new IOException("URL cannot be empty.");
+        }
+        urlStr = urlStr.trim();
+        URI uri;
+        try {
+            uri = URI.create(urlStr);
+        } catch (Exception e) {
+            throw new IOException("Invalid URL format: " + e.getMessage());
+        }
+
+        validateUrlSafety(uri);
+
+        String id = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        Path bookDir = root().resolve(id);
+        Files.createDirectories(bookDir);
+        Path pdf = bookDir.resolve("source.pdf");
+
+        String detectedFilename = "document.pdf";
+        long totalBytes = 0;
+
+        try {
+            URI currentUri = uri;
+            HttpURLConnection conn = null;
+            int redirects = 0;
+
+            while (redirects < 4) {
+                validateUrlSafety(currentUri);
+                URL url = currentUri.toURL();
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(false);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 FlipToRead/1.0");
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(60000);
+
+                int status = conn.getResponseCode();
+                if (status >= 300 && status < 400) {
+                    String location = conn.getHeaderField("Location");
+                    if (location == null || location.isBlank()) {
+                        throw new IOException("Redirect location missing from remote server.");
+                    }
+                    currentUri = currentUri.resolve(location);
+                    redirects++;
+                    conn.disconnect();
+                    continue;
+                }
+
+                if (status != HttpURLConnection.HTTP_OK) {
+                    throw new IOException("Remote server returned HTTP " + status + " (" + conn.getResponseMessage() + ")");
+                }
+                break;
+            }
+
+            if (conn == null) {
+                throw new IOException("Failed to establish connection to URL.");
+            }
+
+            String disp = conn.getHeaderField("Content-Disposition");
+            if (disp != null) {
+                Matcher m = FILENAME_FROM_DISP.matcher(disp);
+                if (m.find()) {
+                    try {
+                        detectedFilename = URLDecoder.decode(m.group(1), StandardCharsets.UTF_8);
+                    } catch (Exception ignored) {
+                        detectedFilename = m.group(1);
+                    }
+                }
+            }
+            if ("document.pdf".equals(detectedFilename) && currentUri.getPath() != null) {
+                String path = currentUri.getPath();
+                int lastSlash = path.lastIndexOf('/');
+                if (lastSlash >= 0 && lastSlash < path.length() - 1) {
+                    String part = path.substring(lastSlash + 1);
+                    try {
+                        part = URLDecoder.decode(part, StandardCharsets.UTF_8);
+                    } catch (Exception ignored) {}
+                    if (part.toLowerCase().endsWith(".pdf")) {
+                        detectedFilename = part;
+                    }
+                }
+            }
+
+            long contentLength = conn.getContentLengthLong();
+            if (contentLength > MAX_PDF_BYTES) {
+                throw new IOException("The PDF file exceeds the maximum size limit of 50 MB.");
+            }
+
+            try (InputStream in = conn.getInputStream();
+                 OutputStream out = Files.newOutputStream(pdf)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) != -1) {
+                    totalBytes += n;
+                    if (totalBytes > MAX_PDF_BYTES) {
+                        throw new IOException("The PDF file exceeds the maximum size limit of 50 MB.");
+                    }
+                    out.write(buf, 0, n);
+                }
+            } finally {
+                conn.disconnect();
+            }
+
+            if (totalBytes < 5) {
+                throw new IOException("The downloaded file is empty or corrupted.");
+            }
+            try (InputStream testIn = Files.newInputStream(pdf)) {
+                byte[] head = testIn.readNBytes(5);
+                if (!new String(head, StandardCharsets.US_ASCII).startsWith("%PDF")) {
+                    throw new IOException("The remote file is not a valid PDF document (missing %PDF signature).");
+                }
+            }
+
+            Path scriptPath = resolveScriptPath();
+            String pythonCmd = resolvePythonCommand();
+
+            ProcessBuilder pb = new ProcessBuilder(
+                    pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(), String.valueOf(dpi));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            if (!process.waitFor(180, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException("Conversion timed out.");
+            }
+
+            if (process.exitValue() != 0) {
+                deleteDirectoryRecursively(bookDir);
+                throw new IOException("Conversion failed: " + (output.isBlank() ? "Exit code " + process.exitValue() : output.trim()));
+            }
+
+            enrichMetadataForUrl(bookDir, id, detectedFilename, totalBytes, urlStr);
+            return id;
+        } catch (Exception e) {
+            deleteDirectoryRecursively(bookDir);
+            throw e;
+        }
+    }
+
+    private void enrichMetadataForUrl(Path bookDir, String id, String filename, long size, String sourceUrl) {
+        Path metaFile = bookDir.resolve("meta.json");
+        Map<String, Object> meta = new HashMap<>();
+        if (Files.exists(metaFile)) {
+            try {
+                meta = mapper.readValue(metaFile.toFile(), new TypeReference<Map<String, Object>>() {});
+            } catch (Exception ignored) {}
+        }
+
+        if (filename == null || filename.isBlank()) {
+            filename = "document.pdf";
+        }
+        if (!filename.toLowerCase().endsWith(".pdf")) {
+            filename += ".pdf";
+        }
+        String cleanTitle = sanitizeTitle(filename);
+
+        meta.put("id", id);
+        meta.put("filename", filename);
+        meta.put("title", cleanTitle);
+        meta.put("size", size);
+        meta.put("sourceUrl", sourceUrl);
+        meta.put("createdAt", Instant.now().toString());
+
+        try {
+            mapper.writerWithDefaultPrettyPrinter().writeValue(metaFile.toFile(), meta);
+        } catch (Exception ignored) {}
+    }
+
+    private void validateUrlSafety(URI uri) throws IOException {
+        String scheme = uri.getScheme();
+        if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+            throw new IOException("Only HTTP and HTTPS URLs are supported.");
+        }
+        String host = uri.getHost();
+        if (host == null || host.isBlank()) {
+            throw new IOException("Invalid URL host.");
+        }
+
+        InetAddress[] addresses;
+        try {
+            addresses = InetAddress.getAllByName(host);
+        } catch (Exception e) {
+            throw new IOException("Cannot resolve host: " + host);
+        }
+
+        for (InetAddress addr : addresses) {
+            if (addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()) {
+                throw new IOException("Access to internal, local, or private network addresses is forbidden.");
+            }
+            byte[] bytes = addr.getAddress();
+            if (bytes.length == 4) {
+                int b0 = bytes[0] & 0xFF;
+                int b1 = bytes[1] & 0xFF;
+                if (b0 == 127 || (b0 == 169 && b1 == 254) || (b0 == 10) || (b0 == 172 && (b1 >= 16 && b1 <= 31)) || (b0 == 192 && b1 == 168) || b0 == 0) {
+                    throw new IOException("Access to internal or private IP ranges is forbidden.");
+                }
+            }
         }
     }
 }

@@ -39,5 +39,15 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/books/**")
                 .addResourceLocations(location);
     }
+
+    @Override
+    public void addCorsMappings(org.springframework.web.servlet.config.annotation.CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOriginPatterns("chrome-extension://*", "http://localhost:*", "http://127.0.0.1:*")
+                .allowedMethods("GET", "POST", "OPTIONS", "DELETE")
+                .allowedHeaders("*")
+                .allowCredentials(false)
+                .maxAge(3600);
+    }
 }
 

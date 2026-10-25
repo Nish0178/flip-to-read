@@ -228,6 +228,121 @@ body.landing-body {
   background: linear-gradient(90deg, transparent, rgba(42, 157, 143, 0.6), rgba(231, 111, 81, 0.6), transparent);
 }
 
+/* Upload Mode Tabs */
+.upload-mode-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  background: rgba(38, 70, 83, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: rgba(38, 70, 83, 0.09);
+  color: var(--text-main);
+}
+
+.tab-btn.active {
+  background: var(--teal-light);
+  border-color: var(--teal-border);
+  color: var(--teal);
+}
+
+/* Remote URL Zone */
+.url-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 32px 24px;
+  background: #fbfdfc;
+  border: 2px dashed rgba(38, 70, 83, 0.22);
+  border-radius: var(--radius-lg);
+  align-items: center;
+}
+
+.url-input-wrap {
+  width: 100%;
+  max-width: 580px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 6px 8px 6px 14px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease;
+}
+
+.url-input-wrap:focus-within {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px var(--teal-light);
+}
+
+.url-icon {
+  color: var(--teal);
+  flex-shrink: 0;
+}
+
+.url-text-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-main);
+  font-size: 0.92rem;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.url-text-input::placeholder {
+  color: var(--text-dim);
+}
+
+.btn-url-convert {
+  background: var(--btn-gradient);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-url-convert:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.btn-url-convert:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.url-hint {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 /* Drop Area */
 .drop-zone {
   border: 2px dashed rgba(38, 70, 83, 0.22);

@@ -8,10 +8,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnSaveSettings = document.getElementById('btn-save-settings') as HTMLButtonElement;
   const saveMsg = document.getElementById('save-msg') as HTMLElement;
   const btnClearHistory = document.getElementById('btn-clear-history') as HTMLButtonElement;
+  const btnOpenPlatform = document.getElementById('btn-open-platform') as HTMLAnchorElement | null;
 
   // Load existing settings
   const settings = await getSettings();
   serverUrlInput.value = settings.serverUrl || 'http://localhost:8080';
+  if (btnOpenPlatform) {
+    btnOpenPlatform.href = settings.serverUrl || 'http://localhost:8080';
+  }
   toggleRememberPos.checked = settings.rememberPosition ?? true;
   toggleOpenInWebsite.checked = settings.openInWebsite ?? false;
   toggleAutoOpen.checked = settings.openAutomatically ?? false;
@@ -27,6 +31,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       openInWebsite: toggleOpenInWebsite.checked,
       openAutomatically: toggleAutoOpen.checked
     });
+
+    if (btnOpenPlatform) {
+      btnOpenPlatform.href = url;
+    }
 
     saveMsg.style.display = 'inline';
     setTimeout(() => {

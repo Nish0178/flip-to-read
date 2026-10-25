@@ -402,3 +402,69 @@ html, body {
     display: none;
   }
 }
+
+/* Download Dropdown */
+.download-dropdown-wrapper {
+  position: relative;
+}
+
+.download-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(38, 70, 83, 0.15);
+  padding: 6px;
+  min-width: 230px;
+  z-index: 100;
+}
+
+.download-dropdown-menu.active {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.download-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--text-main);
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 500;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.download-menu-item:hover {
+  background: rgba(38, 70, 83, 0.06);
+}
+
+.download-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--teal-light);
+  color: var(--teal);
+  border: 1px solid var(--teal-border);
+  text-transform: uppercase;
+}
+
+.download-badge.html-badge {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}

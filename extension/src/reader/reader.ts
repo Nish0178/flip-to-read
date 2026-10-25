@@ -21,6 +21,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnFullscreen = document.getElementById('btn-fullscreen') as HTMLButtonElement;
   const fullscreenText = document.getElementById('fullscreen-text') as HTMLElement;
   const btnOpenInWebsite = document.getElementById('btn-open-in-website') as HTMLButtonElement;
+
+  const btnDownloadMenu = document.getElementById('btn-download-menu') as HTMLButtonElement | null;
+  const downloadDropdown = document.getElementById('download-dropdown-menu') as HTMLElement | null;
+  const downloadPdfLink = document.getElementById('download-pdf-link') as HTMLAnchorElement | null;
+  const downloadHtmlLink = document.getElementById('download-html-link') as HTMLAnchorElement | null;
+  const downloadZipLink = document.getElementById('download-zip-link') as HTMLAnchorElement | null;
+
   const loadingOverlay = document.getElementById('loading-overlay') as HTMLElement;
   const errorOverlay = document.getElementById('error-overlay') as HTMLElement;
   const errorTitle = document.getElementById('error-title') as HTMLElement;
@@ -44,10 +51,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  // Download menu toggle
+  if (btnDownloadMenu && downloadDropdown) {
+    btnDownloadMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      downloadDropdown.classList.toggle('active');
+      jumpPopover.classList.remove('active');
+    });
+
+    document.addEventListener('click', () => {
+      downloadDropdown.classList.remove('active');
+    });
+  }
+
   // Popover toggle
   btnPageBadge.addEventListener('click', (e) => {
     e.stopPropagation();
     jumpPopover.classList.toggle('active');
+    if (downloadDropdown) downloadDropdown.classList.remove('active');
     if (jumpPopover.classList.contains('active')) {
       jumpInput.focus();
       jumpInput.select();
@@ -105,6 +126,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       bookTitleEl.title = title;
       document.title = `${title} — Flip to Read`;
       jumpInput.max = String(bookMeta.pages);
+
+      // Configure download links
+      if (downloadPdfLink) downloadPdfLink.href = `${serverUrl}/api/books/${encodeURIComponent(bookId!)}/pdf`;
+      if (downloadHtmlLink) downloadHtmlLink.href = `${serverUrl}/api/books/${encodeURIComponent(bookId!)}/flipbook`;
+      if (downloadZipLink) downloadZipLink.href = `${serverUrl}/api/books/${encodeURIComponent(bookId!)}/download`;
 
       // Check stored reading position
       const recentList = await getRecentBooks();

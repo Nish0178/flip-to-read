@@ -720,7 +720,10 @@ public class ConverterService {
             HttpURLConnection conn = null;
             int redirects = 0;
 
-            while (redirects < 4) {
+            while (true) {
+                if (redirects >= 4) {
+                    throw new IOException("Too many HTTP redirects (exceeded maximum of 4).");
+                }
                 validateUrlSafety(currentUri);
                 URL url = currentUri.toURL();
                 conn = (HttpURLConnection) url.openConnection();
@@ -735,7 +738,11 @@ public class ConverterService {
                     if (location == null || location.isBlank()) {
                         throw new IOException("Redirect location missing from remote server.");
                     }
-                    currentUri = currentUri.resolve(location);
+                    try {
+                        currentUri = currentUri.resolve(URI.create(location.trim()));
+                    } catch (Exception e) {
+                        throw new IOException("Invalid redirect URL: " + location);
+                    }
                     redirects++;
                     conn.disconnect();
                     continue;
@@ -889,6 +896,24 @@ public class ConverterService {
                 int b1 = bytes[1] & 0xFF;
                 if (b0 == 127 || (b0 == 169 && b1 == 254) || (b0 == 10) || (b0 == 172 && (b1 >= 16 && b1 <= 31)) || (b0 == 192 && b1 == 168) || b0 == 0) {
                     throw new IOException("Access to internal or private IP ranges is forbidden.");
+                }
+            } else if (bytes.length == 16) {
+                int b0 = bytes[0] & 0xFF;
+                // IPv6 Unique Local Address (ULA) fc00::/7 (0xfc or 0xfd)
+                if ((b0 & 0xFE) == 0xFC) {
+                    throw new IOException("Access to internal, local, or private network addresses is forbidden.");
+                }
+                // Check IPv4-mapped IPv6 address (::ffff:x.x.x.x)
+                boolean isIPv4Mapped = true;
+                for (int i = 0; i < 10; i++) {
+                    if (bytes[i] != 0) { isIPv4Mapped = false; break; }
+                }
+                if (isIPv4Mapped && (bytes[10] & 0xFF) == 0xFF && (bytes[11] & 0xFF) == 0xFF) {
+                    int ip0 = bytes[12] & 0xFF;
+                    int ip1 = bytes[13] & 0xFF;
+                    if (ip0 == 127 || (ip0 == 169 && ip1 == 254) || (ip0 == 10) || (ip0 == 172 && (ip1 >= 16 && ip1 <= 31)) || (ip0 == 192 && ip1 == 168) || ip0 == 0) {
+                        throw new IOException("Access to internal or private IP ranges is forbidden.");
+                    }
                 }
             }
         }

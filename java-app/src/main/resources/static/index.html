@@ -86,6 +86,18 @@
         </div>
       </div>
 
+      <!-- Mode Tabs: Upload File vs Remote URL -->
+      <div class="upload-mode-tabs" role="tablist">
+        <button type="button" class="tab-btn active" id="tab-file" role="tab" aria-selected="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+          <span>Upload File</span>
+        </button>
+        <button type="button" class="tab-btn" id="tab-url" role="tab" aria-selected="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+          <span>Enter PDF URL</span>
+        </button>
+      </div>
+
       <!-- Drag & Drop Zone -->
       <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Upload PDF Area">
         <div class="drop-icon-wrapper">
@@ -99,6 +111,16 @@
         </div>
         <div class="drop-limit">Maximum file size: 50 MB &bull; PDF documents only</div>
         <input type="file" id="file-input" accept="application/pdf,.pdf" style="display: none;" aria-hidden="true">
+      </div>
+
+      <!-- Remote URL Input Zone -->
+      <div class="url-zone" id="url-zone" style="display: none;">
+        <div class="url-input-wrap">
+          <svg class="url-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+          <input type="url" id="url-input" class="url-text-input" placeholder="https://example.com/document.pdf" aria-label="PDF Document URL">
+          <button type="button" class="btn-url-convert" id="btn-url-convert">Convert</button>
+        </div>
+        <div class="url-hint">Enter a direct link to any publicly accessible PDF document (max 50 MB)</div>
       </div>
 
       <!-- File Preview (Visible after selecting a file) -->
@@ -315,6 +337,12 @@
       const errorAlert = document.getElementById('error-alert');
       const errorMessage = document.getElementById('error-message');
 
+      const tabFile = document.getElementById('tab-file');
+      const tabUrl = document.getElementById('tab-url');
+      const urlZone = document.getElementById('url-zone');
+      const urlInput = document.getElementById('url-input');
+      const btnUrlConvert = document.getElementById('btn-url-convert');
+
       const recentSection = document.getElementById('recent-section');
       const recentGrid = document.getElementById('recent-grid');
       const btnClearRecent = document.getElementById('btn-clear-recent');
@@ -327,6 +355,39 @@
       const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
       let selectedFile = null;
       let stepInterval = null;
+
+      // Mode switching
+      tabFile.addEventListener('click', () => {
+        tabFile.classList.add('active');
+        tabFile.setAttribute('aria-selected', 'true');
+        tabUrl.classList.remove('active');
+        tabUrl.setAttribute('aria-selected', 'false');
+        urlZone.style.display = 'none';
+        clearError();
+        if (selectedFile) {
+          filePreview.classList.add('active');
+          actionArea.style.display = 'flex';
+          dropZone.style.display = 'none';
+          setStepper(3);
+        } else {
+          dropZone.style.display = 'flex';
+          setStepper(1);
+        }
+      });
+
+      tabUrl.addEventListener('click', () => {
+        tabUrl.classList.add('active');
+        tabUrl.setAttribute('aria-selected', 'true');
+        tabFile.classList.remove('active');
+        tabFile.setAttribute('aria-selected', 'false');
+        dropZone.style.display = 'none';
+        filePreview.classList.remove('active');
+        actionArea.style.display = 'none';
+        urlZone.style.display = 'flex';
+        clearError();
+        setStepper(1);
+        urlInput.focus();
+      });
 
       // Modal handlers
       btnGetExtension.addEventListener('click', () => extensionModal.classList.add('active'));
@@ -495,6 +556,87 @@
           btnChangeFile.disabled = false;
           setStepper(3);
           showError(err.message || "Failed to create flipbook. Please try again.");
+        }
+      }
+
+      btnUrlConvert.addEventListener('click', startUrlConversion);
+      urlInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          startUrlConversion();
+        }
+      });
+
+      async function startUrlConversion() {
+        const rawUrl = (urlInput.value || '').trim();
+        clearError();
+
+        if (!rawUrl) {
+          showError('Please enter a valid PDF URL.');
+          urlInput.focus();
+          return;
+        }
+
+        if (!rawUrl.toLowerCase().startsWith('http://') && !rawUrl.toLowerCase().startsWith('https://')) {
+          showError('Only HTTP and HTTPS URLs are supported.');
+          urlInput.focus();
+          return;
+        }
+
+        setStepper(3); // Validated
+        btnUrlConvert.disabled = true;
+        progressBox.classList.add('active');
+        setStepper(4); // Downloading from remote URL
+
+        const steps = [
+          { msg: "Connecting to remote PDF server...", step: 4 },
+          { msg: "Validating SSRF security & headers...", step: 4 },
+          { msg: "Downloading PDF document...", step: 4 },
+          { msg: "Rasterizing pages with PyMuPDF...", step: 5 },
+          { msg: "Generating page textures & dimensions...", step: 5 },
+          { msg: "Preparing realistic flipbook...", step: 5 },
+          { msg: "Opening reader...", step: 6 }
+        ];
+        let stepIdx = 0;
+        progressText.textContent = steps[0].msg;
+        stepInterval = setInterval(() => {
+          stepIdx = (stepIdx + 1) % steps.length;
+          progressText.textContent = steps[stepIdx].msg;
+          setStepper(steps[stepIdx].step);
+        }, 2200);
+
+        try {
+          const res = await fetch('/api/upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: rawUrl })
+          });
+
+          const data = await res.json().catch(() => ({}));
+          clearInterval(stepInterval);
+
+          if (!res.ok) {
+            throw new Error(data.error || 'URL conversion failed. Please check the URL and try again.');
+          }
+
+          setStepper(6); // Open Flipbook
+          progressText.textContent = "Redirecting to your flipbook...";
+
+          saveToRecentBooks({
+            id: data.id,
+            title: data.title || "Remote Document",
+            pages: data.pages || 1,
+            lastPage: 1,
+            timestamp: Date.now()
+          });
+
+          window.location.href = '/flipbook.html?id=' + encodeURIComponent(data.id);
+        } catch (err) {
+          clearInterval(stepInterval);
+          progressBox.classList.remove('active');
+          btnUrlConvert.disabled = false;
+          setStepper(1);
+          showError(err.message || 'Failed to convert remote PDF.');
         }
       }
 

@@ -73,37 +73,45 @@ public class BookController {
     }
 
     @GetMapping({"/books/{id}", "/books/{id}/metadata"})
-    public ResponseEntity<?> book(@PathVariable String id) throws Exception {
+    public ResponseEntity<?> book(@PathVariable String id) {
         if (!ID.matcher(id).matches()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid id"));
         }
-        Map<String, Object> meta = service.meta(id);
-        if (meta == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Flipbook not found"));
+        try {
+            Map<String, Object> meta = service.meta(id);
+            if (meta == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Flipbook not found"));
+            }
+            return ResponseEntity.ok(meta);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to retrieve book metadata: " + e.getMessage()));
         }
-        return ResponseEntity.ok(meta);
     }
 
     @GetMapping("/books/{id}/pages")
-    public ResponseEntity<?> pages(@PathVariable String id) throws Exception {
+    public ResponseEntity<?> pages(@PathVariable String id) {
         if (!ID.matcher(id).matches()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid id"));
         }
-        Map<String, Object> meta = service.meta(id);
-        if (meta == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Flipbook not found"));
+        try {
+            Map<String, Object> meta = service.meta(id);
+            if (meta == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Flipbook not found"));
+            }
+            int pageCount = meta.get("pages") instanceof Number ? ((Number) meta.get("pages")).intValue() : 0;
+            List<String> pageList = new ArrayList<>();
+            for (int i = 1; i <= pageCount; i++) {
+                pageList.add("/books/" + id + "/page-" + i + ".jpg");
+            }
+            return ResponseEntity.ok(Map.of(
+                    "id", id,
+                    "title", meta.getOrDefault("title", "Flipbook"),
+                    "pageCount", pageCount,
+                    "pages", pageList
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to list book pages: " + e.getMessage()));
         }
-        int pageCount = meta.get("pages") instanceof Number ? ((Number) meta.get("pages")).intValue() : 0;
-        List<String> pageList = new ArrayList<>();
-        for (int i = 1; i <= pageCount; i++) {
-            pageList.add("/books/" + id + "/page-" + i + ".jpg");
-        }
-        return ResponseEntity.ok(Map.of(
-                "id", id,
-                "title", meta.getOrDefault("title", "Flipbook"),
-                "pageCount", pageCount,
-                "pages", pageList
-        ));
     }
 
     @GetMapping("/books/{id}/pdf")
@@ -154,26 +162,32 @@ public class BookController {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid id");
             return;
         }
-        Path bookDir = service.getBookDir(id);
-        if (bookDir == null) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Flipbook not found");
-            return;
+        try {
+            Path bookDir = service.getBookDir(id);
+            if (bookDir == null) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Flipbook not found");
+                return;
+            }
+
+            Map<String, Object> meta = service.meta(id);
+            String title = meta != null && meta.get("title") != null
+                    ? (String) meta.get("title")
+                    : "Flipbook";
+            String safeZipName = ConverterService.sanitizeForFilename(title) + "_Flipbook.zip";
+
+            ContentDisposition disposition = ContentDisposition.attachment()
+                    .filename(safeZipName)
+                    .build();
+
+            response.setContentType("application/zip");
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, disposition.toString());
+            service.generateZip(id, response.getOutputStream());
+            response.flushBuffer();
+        } catch (Exception e) {
+            if (!response.isCommitted()) {
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to generate flipbook archive: " + e.getMessage());
+            }
         }
-
-        Map<String, Object> meta = service.meta(id);
-        String title = meta != null && meta.get("title") != null
-                ? (String) meta.get("title")
-                : "Flipbook";
-        String safeZipName = ConverterService.sanitizeForFilename(title) + "_Flipbook.zip";
-
-        ContentDisposition disposition = ContentDisposition.attachment()
-                .filename(safeZipName)
-                .build();
-
-        response.setContentType("application/zip");
-        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, disposition.toString());
-        service.generateZip(id, response.getOutputStream());
-        response.flushBuffer();
     }
 
     @GetMapping("/books/{id}/flipbook")
@@ -182,26 +196,32 @@ public class BookController {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid id");
             return;
         }
-        Path bookDir = service.getBookDir(id);
-        if (bookDir == null) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Flipbook not found");
-            return;
+        try {
+            Path bookDir = service.getBookDir(id);
+            if (bookDir == null) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Flipbook not found");
+                return;
+            }
+
+            Map<String, Object> meta = service.meta(id);
+            String title = meta != null && meta.get("title") != null
+                    ? (String) meta.get("title")
+                    : "Flipbook";
+            String safeHtmlName = ConverterService.sanitizeForFilename(title) + "_Flipbook.html";
+
+            ContentDisposition disposition = ContentDisposition.attachment()
+                    .filename(safeHtmlName)
+                    .build();
+
+            response.setContentType("text/html;charset=UTF-8");
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, disposition.toString());
+            standaloneService.generateStandaloneHtml(id, response.getOutputStream());
+            response.flushBuffer();
+        } catch (Exception e) {
+            if (!response.isCommitted()) {
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to generate standalone flipbook: " + e.getMessage());
+            }
         }
-
-        Map<String, Object> meta = service.meta(id);
-        String title = meta != null && meta.get("title") != null
-                ? (String) meta.get("title")
-                : "Flipbook";
-        String safeHtmlName = ConverterService.sanitizeForFilename(title) + "_Flipbook.html";
-
-        ContentDisposition disposition = ContentDisposition.attachment()
-                .filename(safeHtmlName)
-                .build();
-
-        response.setContentType("text/html;charset=UTF-8");
-        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, disposition.toString());
-        standaloneService.generateStandaloneHtml(id, response.getOutputStream());
-        response.flushBuffer();
     }
 
     @DeleteMapping("/books/{id}")

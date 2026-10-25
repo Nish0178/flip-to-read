@@ -43,6 +43,48 @@
 
       <!-- Right Action Toolbar -->
       <div class="reader-header-right">
+        <!-- Download Dropdown -->
+        <div class="download-dropdown-wrapper">
+          <button type="button" class="btn-toolbar" id="btn-download-menu" title="Download Options" aria-haspopup="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+            </svg>
+            <span>Download</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="margin-left: 2px;">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </button>
+          <div class="download-dropdown-menu" id="download-dropdown-menu" role="menu">
+            <a id="download-pdf-link" class="download-menu-item" href="#" role="menuitem" target="_blank">
+              <div class="download-item-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#E76F51">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>
+                <span>Download PDF</span>
+              </div>
+              <span class="download-badge">PDF</span>
+            </a>
+            <a id="download-html-link" class="download-menu-item" href="#" role="menuitem" title="Download single standalone HTML interactive book" target="_blank">
+              <div class="download-item-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#2A9D8F">
+                  <path d="M19 2H6c-1.2 0-2 .8-2 2v16c0 1.2.8 2 2 2h13c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1zm-1 18H6.5c-.3 0-.5-.2-.5-.5s.2-.5.5-.5H18V20zm0-3H6.5c-.8 0-1.5.7-1.5 1.5V4.5c0-.3.2-.5.5-.5H18v13z"/>
+                </svg>
+                <span>Download Flipbook</span>
+              </div>
+              <span class="download-badge html-badge">HTML</span>
+            </a>
+            <a id="download-zip-link" class="download-menu-item" href="#" role="menuitem" target="_blank">
+              <div class="download-item-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#E76F51">
+                  <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H8v-2h6v2zm4-4H8v-2h10v2z"/>
+                </svg>
+                <span>Download Offline Flipbook</span>
+              </div>
+              <span class="download-badge">ZIP</span>
+            </a>
+          </div>
+        </div>
+
         <!-- Open in Flip to Read Website Button -->
         <button type="button" class="btn-toolbar btn-open-web" id="btn-open-in-website" title="Open this book in the main Flip to Read website">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

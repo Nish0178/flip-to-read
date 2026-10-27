@@ -53,6 +53,9 @@ public class ConverterService {
     @Value("${app.dpi}")
     private int dpi;
 
+    @Value("${app.image-format:jpg}")
+    private String imageFormat;
+
     @Value("${app.storage-dir}")
     private String storageDir;
 
@@ -218,7 +221,7 @@ public class ConverterService {
         String pythonCmd = resolvePythonCommand();
 
         ProcessBuilder pb = new ProcessBuilder(
-                pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(), String.valueOf(dpi));
+                pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(), String.valueOf(dpi), imageFormat);
         pb.redirectErrorStream(true);
         Process process = pb.start();
 
@@ -364,11 +367,12 @@ public class ConverterService {
         }
 
         byte[] pageFlipJs = loadPageFlipJs();
-        String offlineHtml = buildOfflineHtml(meta, pages.size(), rawTitle);
+        String pageFlipJsStr = new String(pageFlipJs, StandardCharsets.UTF_8);
+        String offlineHtml = buildOfflineHtml(meta, pages.size(), rawTitle, pageFlipJsStr);
         String readmeTxt = buildReadme(rawTitle, pages.size());
 
         try (ZipOutputStream zos = new ZipOutputStream(os)) {
-            // 1. index.html
+            // 1. index.html (self-contained with inlined PageFlip JS engine)
             ZipEntry htmlEntry = new ZipEntry(folderName + "/index.html");
             zos.putNextEntry(htmlEntry);
             zos.write(offlineHtml.getBytes(StandardCharsets.UTF_8));
@@ -380,7 +384,7 @@ public class ConverterService {
             zos.write(readmeTxt.getBytes(StandardCharsets.UTF_8));
             zos.closeEntry();
 
-            // 3. js/page-flip.browser.js
+            // 3. js/page-flip.browser.js (also kept for modular directory structure)
             ZipEntry jsEntry = new ZipEntry(folderName + "/js/page-flip.browser.js");
             zos.putNextEntry(jsEntry);
             zos.write(pageFlipJs);
@@ -392,7 +396,19 @@ public class ConverterService {
             zos.write(mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(meta));
             zos.closeEntry();
 
-            // 5. assets/page-1.jpg, page-2.jpg ...
+            // 5. Original source PDF if available
+            Path sourcePdf = getSourcePdf(id);
+            if (sourcePdf != null && Files.exists(sourcePdf)) {
+                String originalName = meta.get("filename") != null ? (String) meta.get("filename") : "source.pdf";
+                String safePdfName = sanitizeForFilename(originalName);
+                if (!safePdfName.toLowerCase().endsWith(".pdf")) safePdfName += ".pdf";
+                ZipEntry pdfEntry = new ZipEntry(folderName + "/" + safePdfName);
+                zos.putNextEntry(pdfEntry);
+                Files.copy(sourcePdf, zos);
+                zos.closeEntry();
+            }
+
+            // 6. assets/page-1.jpg, page-2.jpg ...
             byte[] buffer = new byte[16384];
             for (Path pagePath : pages) {
                 String fileName = pagePath.getFileName().toString();
@@ -470,7 +486,7 @@ public class ConverterService {
              + "Created with FlipBook.\n";
     }
 
-    private String buildOfflineHtml(Map<String, Object> meta, int pageCount, String title) {
+    private String buildOfflineHtml(Map<String, Object> meta, int pageCount, String title, String pageFlipJs) {
         String metaJson;
         try {
             metaJson = mapper.writeValueAsString(meta);
@@ -535,9 +551,32 @@ public class ConverterService {
              + "      background: #2A9D8F; border-color: #2A9D8F; color: #ffffff;\n"
              + "    }\n"
              + "    .btn:disabled { opacity: 0.35; cursor: not-allowed; }\n"
-             + "    .page-counter {\n"
-             + "      font-size: 0.88rem; font-weight: 600; color: #527179; min-width: 110px; text-align: center;\n"
+             + "    .page-badge-btn {\n"
+             + "      display: inline-flex; align-items: center; justify-content: center;\n"
+             + "      background: rgba(42, 157, 143, 0.1); color: #2A9D8F; border: 1px solid rgba(42, 157, 143, 0.3);\n"
+             + "      border-radius: 6px; padding: 6px 14px; font-size: 0.88rem; font-weight: 600;\n"
+             + "      cursor: pointer; transition: all 0.15s ease;\n"
              + "    }\n"
+             + "    .page-badge-btn:hover { background: rgba(42, 157, 143, 0.2); border-color: #2A9D8F; }\n"
+             + "    .jump-popover {\n"
+             + "      display: none; position: absolute; bottom: 62px; left: 50%; transform: translateX(-50%);\n"
+             + "      background: #ffffff; border: 1px solid rgba(38, 70, 83, 0.15); border-radius: 10px;\n"
+             + "      box-shadow: 0 10px 25px rgba(38, 70, 83, 0.18); padding: 12px 14px; z-index: 50;\n"
+             + "      flex-direction: column; gap: 8px; min-width: 170px;\n"
+             + "    }\n"
+             + "    .jump-popover.active { display: flex; }\n"
+             + "    .jump-label { font-size: 0.78rem; font-weight: 600; color: #527179; text-transform: uppercase; letter-spacing: 0.04em; }\n"
+             + "    .jump-row { display: flex; gap: 6px; }\n"
+             + "    .jump-input {\n"
+             + "      width: 70px; padding: 6px 8px; border: 1px solid rgba(38, 70, 83, 0.2); border-radius: 6px;\n"
+             + "      font-size: 0.9rem; font-weight: 600; color: #264653; text-align: center; outline: none;\n"
+             + "    }\n"
+             + "    .jump-input:focus { border-color: #2A9D8F; }\n"
+             + "    .jump-btn {\n"
+             + "      padding: 6px 12px; background: #2A9D8F; color: #ffffff; border: none; border-radius: 6px;\n"
+             + "      font-size: 0.84rem; font-weight: 600; cursor: pointer; transition: background 0.15s ease;\n"
+             + "    }\n"
+             + "    .jump-btn:hover { background: #238276; }\n"
              + "    .loading-overlay {\n"
              + "      position: absolute; inset: 0; display: flex; flex-direction: column;\n"
              + "      align-items: center; justify-content: center; gap: 14px;\n"
@@ -561,7 +600,7 @@ public class ConverterService {
              + "    <main class=\"viewport\" id=\"viewport\">\n"
              + "      <div class=\"loading-overlay\" id=\"loading\">\n"
              + "        <div class=\"spinner\"></div>\n"
-             + "        <span>Loading book...</span>\n"
+             + "        <span id=\"loading-text\">Loading book...</span>\n"
              + "      </div>\n"
              + "      <div id=\"book-container\">\n"
              + "        <div id=\"book\"></div>\n"
@@ -569,23 +608,37 @@ public class ConverterService {
              + "    </main>\n"
              + "    <footer>\n"
              + "      <button class=\"btn\" id=\"btn-prev\" aria-label=\"Previous page\">&lsaquo; Prev</button>\n"
-             + "      <div class=\"page-counter\" id=\"counter\">Page 1 / " + pageCount + "</div>\n"
+             + "      <div style=\"position: relative;\">\n"
+             + "        <button type=\"button\" class=\"page-badge-btn\" id=\"btn-page-badge\">Page 1 / " + pageCount + "</button>\n"
+             + "        <div class=\"jump-popover\" id=\"jump-popover\">\n"
+             + "          <span class=\"jump-label\">Go to page:</span>\n"
+             + "          <div class=\"jump-row\">\n"
+             + "            <input type=\"number\" id=\"jump-input\" min=\"1\" max=\"" + pageCount + "\" value=\"1\" class=\"jump-input\">\n"
+             + "            <button type=\"button\" id=\"btn-jump-go\" class=\"jump-btn\">Go</button>\n"
+             + "          </div>\n"
+             + "        </div>\n"
+             + "      </div>\n"
              + "      <button class=\"btn\" id=\"btn-next\" aria-label=\"Next page\">Next &rsaquo;</button>\n"
              + "      <button class=\"btn\" id=\"btn-full\" aria-label=\"Fullscreen\">Fullscreen</button>\n"
              + "    </footer>\n"
              + "  </div>\n"
-             + "  <script src=\"js/page-flip.browser.js\"></script>\n"
+             + "  <!-- Bundled Self-Contained PageFlip Engine -->\n"
+             + "  <script>\n" + pageFlipJs + "\n  </script>\n"
              + "  <script>\n"
              + "    const meta = " + metaJson + ";\n"
              + "    const totalPages = " + pageCount + ";\n"
              + "    let flip = null;\n"
              + "    const viewport = document.getElementById('viewport');\n"
              + "    const bookContainer = document.getElementById('book-container');\n"
-             + "    const counter = document.getElementById('counter');\n"
+             + "    const btnPageBadge = document.getElementById('btn-page-badge');\n"
+             + "    const jumpPopover = document.getElementById('jump-popover');\n"
+             + "    const jumpInput = document.getElementById('jump-input');\n"
+             + "    const btnJumpGo = document.getElementById('btn-jump-go');\n"
              + "    const btnPrev = document.getElementById('btn-prev');\n"
              + "    const btnNext = document.getElementById('btn-next');\n"
              + "    const btnFull = document.getElementById('btn-full');\n"
-             + "    const loading = document.getElementById('loading');\n\n"
+             + "    const loading = document.getElementById('loading');\n"
+             + "    const loadingText = document.getElementById('loading-text');\n\n"
              + "    function calcDimensions() {\n"
              + "      const vw = Math.max(300, viewport.clientWidth - 32);\n"
              + "      const vh = Math.max(300, viewport.clientHeight - 24);\n"
@@ -595,7 +648,7 @@ public class ConverterService {
              + "      const aspect = origW / origH;\n"
              + "      let pageW, pageH;\n"
              + "      if (isMobile) {\n"
-             + "        let targetW = Math.min(vw, 650);\n"
+             + "        let targetW = Math.min(vw, 680);\n"
              + "        let targetH = targetW / aspect;\n"
              + "        if (targetH > vh) { targetH = vh; targetW = targetH * aspect; }\n"
              + "        pageW = Math.round(targetW); pageH = Math.round(targetH);\n"
@@ -611,11 +664,30 @@ public class ConverterService {
              + "    function updateControls() {\n"
              + "      if (!flip) return;\n"
              + "      const idx = flip.getCurrentPageIndex() || 0;\n"
-             + "      counter.textContent = 'Page ' + (idx + 1) + ' / ' + totalPages;\n"
+             + "      const curr = idx + 1;\n"
+             + "      btnPageBadge.textContent = 'Page ' + curr + ' / ' + totalPages;\n"
+             + "      jumpInput.value = curr;\n"
              + "      btnPrev.disabled = idx <= 0;\n"
              + "      btnNext.disabled = idx >= totalPages - 1;\n"
              + "    }\n\n"
+             + "    function hideLoading() {\n"
+             + "      if (loading && loading.style.display !== 'none') {\n"
+             + "        loading.style.opacity = '0';\n"
+             + "        setTimeout(() => { loading.style.display = 'none'; }, 300);\n"
+             + "      }\n"
+             + "    }\n\n"
+             + "    function performJump() {\n"
+             + "      const target = parseInt(jumpInput.value, 10);\n"
+             + "      if (!isNaN(target) && target >= 1 && target <= totalPages) {\n"
+             + "        jumpPopover.classList.remove('active');\n"
+             + "        if (flip) flip.flip(target - 1);\n"
+             + "      }\n"
+             + "    }\n\n"
              + "    function initFlipbook() {\n"
+             + "      if (typeof St === 'undefined' || !St.PageFlip) {\n"
+             + "        if (loadingText) loadingText.textContent = 'Flipbook engine failed to load.';\n"
+             + "        return;\n"
+             + "      }\n"
              + "      const dims = calcDimensions();\n"
              + "      bookContainer.innerHTML = '<div id=\"book\"></div>';\n"
              + "      const bookEl = document.getElementById('book');\n"
@@ -628,21 +700,36 @@ public class ConverterService {
              + "        maxShadowOpacity: 0.5,\n"
              + "        mobileScrollSupport: false\n"
              + "      });\n"
-             + "      const pages = Array.from({ length: totalPages }, (_, i) => 'assets/page-' + (i + 1) + '.jpg');\n"
-             + "      flip.loadFromImages(pages);\n"
              + "      flip.on('flip', updateControls);\n"
              + "      flip.on('init', () => {\n"
              + "        updateControls();\n"
-             + "        loading.style.opacity = '0';\n"
-             + "        setTimeout(() => loading.style.display = 'none', 300);\n"
+             + "        hideLoading();\n"
              + "      });\n"
-             + "      btnPrev.onclick = () => flip.flipPrev();\n"
-             + "      btnNext.onclick = () => flip.flipNext();\n"
+             + "      const pages = Array.from({ length: totalPages }, (_, i) => 'assets/page-' + (i + 1) + '.jpg');\n"
+             + "      flip.loadFromImages(pages);\n"
+             + "      setTimeout(hideLoading, 500);\n"
+             + "      btnPrev.onclick = () => { if (flip) flip.flipPrev(); };\n"
+             + "      btnNext.onclick = () => { if (flip) flip.flipNext(); };\n"
              + "      btnFull.onclick = () => {\n"
              + "        if (document.fullscreenElement) document.exitFullscreen();\n"
              + "        else document.documentElement.requestFullscreen().catch(() => {});\n"
              + "      };\n"
+             + "      btnPageBadge.onclick = (e) => {\n"
+             + "        e.stopPropagation();\n"
+             + "        jumpPopover.classList.toggle('active');\n"
+             + "        if (jumpPopover.classList.contains('active')) {\n"
+             + "          jumpInput.focus();\n"
+             + "          jumpInput.select();\n"
+             + "        }\n"
+             + "      };\n"
+             + "      document.addEventListener('click', () => { jumpPopover.classList.remove('active'); });\n"
+             + "      jumpPopover.onclick = (e) => { e.stopPropagation(); };\n"
+             + "      btnJumpGo.onclick = performJump;\n"
+             + "      jumpInput.addEventListener('keydown', (e) => {\n"
+             + "        if (e.key === 'Enter') performJump();\n"
+             + "      });\n"
              + "      window.addEventListener('keydown', e => {\n"
+             + "        if (!flip || document.activeElement === jumpInput) return;\n"
              + "        if (e.key === 'ArrowLeft') flip.flipPrev();\n"
              + "        else if (e.key === 'ArrowRight') flip.flipNext();\n"
              + "        else if (e.key === 'Home') flip.flip(0);\n"
@@ -661,7 +748,11 @@ public class ConverterService {
              + "        try { flip.flip(curr); } catch (e) {}\n"
              + "      }, 200);\n"
              + "    });\n\n"
-             + "    window.addEventListener('DOMContentLoaded', initFlipbook);\n"
+             + "    if (document.readyState === 'loading') {\n"
+             + "      window.addEventListener('DOMContentLoaded', initFlipbook);\n"
+             + "    } else {\n"
+             + "      initFlipbook();\n"
+             + "    }\n"
              + "  </script>\n"
              + "</body>\n"
              + "</html>";
@@ -817,7 +908,7 @@ public class ConverterService {
             String pythonCmd = resolvePythonCommand();
 
             ProcessBuilder pb = new ProcessBuilder(
-                    pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(), String.valueOf(dpi));
+                    pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(), String.valueOf(dpi), imageFormat);
             pb.redirectErrorStream(true);
             Process process = pb.start();
 

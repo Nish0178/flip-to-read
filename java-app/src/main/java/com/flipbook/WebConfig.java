@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +18,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Value("${app.storage-dir}")
     private String storageDir;
+
+    @Value("${app.cors.allowed-origins:}")
+    private String customCorsOrigins;
 
     private Path resolveStorageDir() {
         Path p = Paths.get(storageDir);
@@ -42,12 +47,22 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(org.springframework.web.servlet.config.annotation.CorsRegistry registry) {
+        List<String> origins = new ArrayList<>(List.of("chrome-extension://*", "http://localhost:*", "http://127.0.0.1:*"));
+        if (customCorsOrigins != null && !customCorsOrigins.isBlank()) {
+            for (String origin : customCorsOrigins.split(",")) {
+                String trimmed = origin.trim();
+                if (!trimmed.isEmpty()) {
+                    origins.add(trimmed);
+                }
+            }
+        }
         registry.addMapping("/**")
-                .allowedOriginPatterns("chrome-extension://*", "http://localhost:*", "http://127.0.0.1:*")
+                .allowedOriginPatterns(origins.toArray(new String[0]))
                 .allowedMethods("GET", "POST", "OPTIONS", "DELETE")
                 .allowedHeaders("*")
                 .allowCredentials(false)
                 .maxAge(3600);
     }
 }
+
 

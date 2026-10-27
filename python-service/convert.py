@@ -20,11 +20,20 @@ except ImportError:
 
 def main() -> int:
     if len(sys.argv) < 3:
-        print("Usage: convert.py <input.pdf> <output_dir> [dpi]", file=sys.stderr)
+        print("Usage: convert.py <input.pdf> <output_dir> [dpi] [format]", file=sys.stderr)
         return 1
 
     pdf_path, out_dir = sys.argv[1], sys.argv[2]
-    dpi = int(sys.argv[3]) if len(sys.argv) > 3 else 110
+    env_dpi = os.environ.get("APP_DPI", "180")
+    try:
+        default_dpi = int(env_dpi)
+    except ValueError:
+        default_dpi = 180
+    dpi = int(sys.argv[3]) if len(sys.argv) > 3 else default_dpi
+
+    raw_format = sys.argv[4] if len(sys.argv) > 4 else os.environ.get("APP_IMAGE_FORMAT", "jpg")
+    img_format = "png" if raw_format.lower() in ("png", "image/png") else "jpg"
+
     os.makedirs(out_dir, exist_ok=True)
 
     try:
@@ -49,9 +58,18 @@ def main() -> int:
             pix = page.get_pixmap(matrix=matrix, alpha=False)
             if number == 1:
                 width, height = pix.width, pix.height
-            pix.save(os.path.join(out_dir, f"page-{number}.jpg"), jpg_quality=85)
+            if img_format == "png":
+                pix.save(os.path.join(out_dir, f"page-{number}.png"))
+            else:
+                pix.save(os.path.join(out_dir, f"page-{number}.jpg"), jpg_quality=95)
 
-        meta = {"pages": doc.page_count, "width": width, "height": height}
+        meta = {
+            "pages": doc.page_count,
+            "width": width,
+            "height": height,
+            "dpi": dpi,
+            "format": img_format
+        }
         with open(os.path.join(out_dir, "meta.json"), "w", encoding="utf-8") as f:
             json.dump(meta, f)
 

@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# IDE & agent artifacts
+.agent
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Maven build outputs
+target/
+java-app/target/
+*.class
+
+# Node / Extension build & dependencies
+node_modules/
+extension/node_modules/
+extension/dist/
+
+# Python cache & virtualenvs
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Local storage, uploads & generated flipbooks
+storage/
+java-app/storage/
+uploads/
+generated/
+
+# Test documents, scratch & logs
+*.log
+*.pdf
+*.zip
+scratch/
+test-results/

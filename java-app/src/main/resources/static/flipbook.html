@@ -206,13 +206,11 @@
 
   </div>
 
-  <!-- Local PageFlip Library with CDN Fallback -->
+  <!-- PDF.js Core Library -->
+  <script src="/pdfjs/pdf.min.js"></script>
+
+  <!-- Local PageFlip Library -->
   <script src="page-flip.browser.js"></script>
-  <script>
-    if (typeof St === 'undefined') {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>');
-    }
-  </script>
 
   <!-- Application Logic -->
   <script>
@@ -302,6 +300,151 @@
         });
       }
 
+      const PLACEHOLDER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='1100'><rect width='100%' height='100%' fill='%23ffffff'/><circle cx='400' cy='550' r='18' fill='none' stroke='%232a9d8f' stroke-width='3' stroke-dasharray='60 30'/><text x='400' y='600' fill='%23527179' font-size='15' text-anchor='middle' font-family='sans-serif'>Rendering...</text></svg>";
+
+      let pdfDoc = null;
+      const renderCache = new Map();
+      const renderTasks = new Map();
+      let renderQueue = Promise.resolve();
+
+      async function doRenderPage(pageNum, targetW, targetH) {
+        if (!pdfDoc) return null;
+        const page = await pdfDoc.getPage(pageNum);
+        const unscaledVp = page.getViewport({ scale: 1.0 });
+
+        // High-resolution scale calculation: preserves crisp vector quality on high-DPI displays
+        const baseScale = targetW / unscaledVp.width;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        const qualityMultiplier = Math.max(1.5, Math.min(dpr * 1.5, 2.5));
+        let scale = baseScale * qualityMultiplier;
+
+        let vp = page.getViewport({ scale: scale });
+        const MAX_CANVAS_DIM = 4096;
+        if (vp.width > MAX_CANVAS_DIM || vp.height > MAX_CANVAS_DIM) {
+          const cap = Math.min(MAX_CANVAS_DIM / vp.width, MAX_CANVAS_DIM / vp.height);
+          scale *= cap;
+          vp = page.getViewport({ scale: scale });
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(vp.width);
+        canvas.height = Math.round(vp.height);
+        const ctx = canvas.getContext('2d', { alpha: false });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        await page.render({
+          canvasContext: ctx,
+          viewport: vp,
+          intent: 'display'
+        }).promise;
+
+        return canvas.toDataURL('image/jpeg', 0.94);
+      }
+
+      function renderPage(pageNum, targetW, targetH) {
+        if (renderCache.has(pageNum)) {
+          return Promise.resolve(renderCache.get(pageNum));
+        }
+        if (renderTasks.has(pageNum)) {
+          return renderTasks.get(pageNum);
+        }
+
+        const task = new Promise((resolve) => {
+          renderQueue = renderQueue.then(async () => {
+            if (renderCache.has(pageNum)) {
+              resolve(renderCache.get(pageNum));
+              return;
+            }
+            try {
+              const dataUrl = await doRenderPage(pageNum, targetW, targetH);
+              renderCache.set(pageNum, dataUrl);
+
+              if (renderCache.size > 28) {
+                const curr = (flip ? flip.getCurrentPageIndex() : 0) + 1;
+                for (let [k] of renderCache.entries()) {
+                  if (Math.abs(k - curr) > 12) {
+                    renderCache.delete(k);
+                  }
+                }
+              }
+              resolve(dataUrl);
+            } catch (err) {
+              console.error('Failed to render page', pageNum, err);
+              const fmt = bookMeta.format || 'jpg';
+              resolve(`/books/${id}/page-${pageNum}.${fmt}`);
+            } finally {
+              renderTasks.delete(pageNum);
+            }
+          });
+        });
+
+        renderTasks.set(pageNum, task);
+        return task;
+      }
+
+      function applyPageImageToFlip(pageIndex, dataUrl) {
+        const collection = flip ? flip.getPageCollection() : null;
+        if (!collection || !collection.pages) return;
+        const pageObj = collection.pages[pageIndex];
+        if (!pageObj) return;
+
+        if (pageObj.image && pageObj.image.src === dataUrl && pageObj.isLoad) {
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          pageObj.image = img;
+          pageObj.isLoad = true;
+        };
+        img.onerror = () => {
+          console.error('Image load failed for page index', pageIndex);
+          pageObj.isLoad = true;
+        };
+        img.src = dataUrl;
+        if (img.complete && img.naturalWidth > 0) {
+          pageObj.image = img;
+          pageObj.isLoad = true;
+        }
+      }
+
+      function getSpreadPages(pageIndex) {
+        if (!flip || !flip.getPageCollection()) return [pageIndex + 1];
+        const col = flip.getPageCollection();
+        const spIdx = col.getSpreadIndexByPage(pageIndex);
+        if (spIdx !== null && col.getSpread && col.getSpread()[spIdx]) {
+          return col.getSpread()[spIdx].map(i => i + 1);
+        }
+        return [pageIndex + 1];
+      }
+
+      async function warmPagesAround(pageIndex, targetW, targetH) {
+        if (!pdfDoc) return;
+        const pagesToWarm = new Set();
+        getSpreadPages(pageIndex).forEach(p => pagesToWarm.add(p));
+
+        if (pageIndex + 2 < bookMeta.pages) {
+          getSpreadPages(pageIndex + 2).forEach(p => pagesToWarm.add(p));
+        }
+        if (pageIndex - 1 >= 0) {
+          getSpreadPages(pageIndex - 1).forEach(p => pagesToWarm.add(p));
+        }
+        if (pageIndex + 4 < bookMeta.pages) {
+          getSpreadPages(pageIndex + 4).forEach(p => pagesToWarm.add(p));
+        }
+
+        for (const pNum of pagesToWarm) {
+          if (pNum >= 1 && pNum <= bookMeta.pages) {
+            renderPage(pNum, targetW, targetH).then(dataUrl => {
+              applyPageImageToFlip(pNum - 1, dataUrl);
+            });
+          }
+        }
+      }
+
       // Jump to page action
       btnJumpGo.addEventListener('click', performPageJump);
 
@@ -309,7 +452,7 @@
         if (e.key === 'Enter') performPageJump();
       });
 
-      function performPageJump() {
+      async function performPageJump() {
         if (!flip || !bookMeta) return;
         const pageNum = parseInt(jumpInput.value, 10);
         if (isNaN(pageNum) || pageNum < 1 || pageNum > bookMeta.pages) {
@@ -317,8 +460,18 @@
           setTimeout(() => jumpInput.style.borderColor = '', 1000);
           return;
         }
-        flip.flip(pageNum - 1);
         jumpPopover.classList.remove('active');
+        const targetIdx = pageNum - 1;
+
+        if (pdfDoc) {
+          const dims = calculateDimensions();
+          const targetPages = getSpreadPages(targetIdx);
+          await Promise.all(targetPages.map(p => renderPage(p, dims.width, dims.height).then(dataUrl => {
+            applyPageImageToFlip(p - 1, dataUrl);
+          })));
+        }
+
+        flip.flip(targetIdx);
       }
 
       const resumeToast = document.getElementById('resume-toast');
@@ -366,6 +519,26 @@
 
           jumpInput.max = bookMeta.pages;
 
+          // Try loading PDF via PDF.js for crisp high-resolution rendering
+          if (window.pdfjsLib) {
+            try {
+              pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
+              const loadingTask = pdfjsLib.getDocument({
+                url: '/api/books/' + encodeURIComponent(id) + '/pdf',
+                isEvalSupported: true,
+                useSystemFonts: true
+              });
+              pdfDoc = await loadingTask.promise;
+              const firstPage = await pdfDoc.getPage(1);
+              const unscaled = firstPage.getViewport({ scale: 1.0 });
+              bookMeta.width = unscaled.width;
+              bookMeta.height = unscaled.height;
+            } catch (pdfErr) {
+              console.warn("Could not load original PDF via PDF.js, using raster fallback:", pdfErr);
+              pdfDoc = null;
+            }
+          }
+
           // Check URL param or stored reading position
           const urlParams = new URLSearchParams(window.location.search);
           const pageParam = parseInt(urlParams.get('page'), 10);
@@ -376,7 +549,7 @@
             startPage = pageParam - 1;
           }
 
-          buildFlipbook(startPage);
+          await buildFlipbook(startPage);
 
           // Prompt to continue if a saved position > 1 exists
           if (isNaN(pageParam) && !isNaN(storedPos) && storedPos > 1 && storedPos <= bookMeta.pages) {
@@ -408,7 +581,6 @@
        * ZERO body scrolling: fits within viewport clientWidth & clientHeight.
        */
       function calculateDimensions() {
-        // Leave comfortable padding around the book stage
         const availW = Math.max(280, viewportEl.clientWidth - 32);
         const availH = Math.max(260, viewportEl.clientHeight - 24);
 
@@ -420,7 +592,6 @@
         let pageW, pageH;
 
         if (isMobile) {
-          // Single-page mode
           let targetW = Math.min(availW, 680);
           let targetH = targetW / aspect;
           if (targetH > availH) {
@@ -430,7 +601,6 @@
           pageW = Math.round(targetW);
           pageH = Math.round(targetH);
         } else {
-          // Two-page spread mode
           let targetSpreadW = Math.min(availW, 1500);
           let targetPageW = targetSpreadW / 2;
           let targetH = targetPageW / aspect;
@@ -463,10 +633,15 @@
         btnPrev.disabled = currentZeroBased <= 0;
         btnNext.disabled = currentZeroBased >= total - 1;
 
+        if (pdfDoc) {
+          const dims = calculateDimensions();
+          warmPagesAround(currentZeroBased, dims.width, dims.height);
+        }
+
         saveReadingState(currentPage);
       }
 
-      function buildFlipbook(startPageIndex) {
+      async function buildFlipbook(startPageIndex) {
         if (typeof St === 'undefined' || !St.PageFlip) {
           showError("Library Error", "The page-flip library could not be initialized.");
           return;
@@ -482,27 +657,59 @@
           size: 'fixed',
           showCover: true,
           usePortrait: dims.isMobile,
+          startPage: Math.min(startPageIndex, bookMeta.pages - 1),
           maxShadowOpacity: 0.55,
           mobileScrollSupport: false
         });
 
-        const pages = Array.from({ length: bookMeta.pages }, (_, i) => `/books/${id}/page-${i + 1}.jpg`);
-        flip.loadFromImages(pages);
+        if (pdfDoc) {
+          const initialPages = new Array(bookMeta.pages).fill(PLACEHOLDER);
+          const startSpread = getSpreadPages(startPageIndex);
+          await Promise.all(startSpread.map(async (p) => {
+            const dataUrl = await renderPage(p, dims.width, dims.height);
+            initialPages[p - 1] = dataUrl;
+          }));
+          flip.loadFromImages(initialPages);
+        } else {
+          const fmt = bookMeta.format || 'jpg';
+          const pages = Array.from({ length: bookMeta.pages }, (_, i) => `/books/${id}/page-${i + 1}.${fmt}`);
+          flip.loadFromImages(pages);
+        }
 
         flip.on('flip', updateCounter);
         flip.on('init', () => {
           updateCounter();
-          if (startPageIndex > 0) {
-            try { flip.flip(startPageIndex); } catch (e) {}
-          }
           loadingOverlay.classList.add('hidden');
           setTimeout(() => loadingOverlay.style.display = 'none', 350);
           isInitialized = true;
         });
 
         // Navigation button events
-        btnPrev.onclick = () => flip.flipPrev();
-        btnNext.onclick = () => flip.flipNext();
+        btnPrev.onclick = () => {
+          if (!flip) return;
+          const idx = flip.getCurrentPageIndex() || 0;
+          if (idx > 0) {
+            if (pdfDoc) {
+              const dims = calculateDimensions();
+              const prevPages = getSpreadPages(Math.max(0, idx - 2));
+              prevPages.forEach(p => renderPage(p, dims.width, dims.height).then(dataUrl => applyPageImageToFlip(p - 1, dataUrl)));
+            }
+            flip.flipPrev();
+          }
+        };
+
+        btnNext.onclick = () => {
+          if (!flip) return;
+          const idx = flip.getCurrentPageIndex() || 0;
+          if (idx < bookMeta.pages - 1) {
+            if (pdfDoc) {
+              const dims = calculateDimensions();
+              const nextPages = getSpreadPages(Math.min(bookMeta.pages - 1, idx + 2));
+              nextPages.forEach(p => renderPage(p, dims.width, dims.height).then(dataUrl => applyPageImageToFlip(p - 1, dataUrl)));
+            }
+            flip.flipNext();
+          }
+        };
       }
 
       // Keyboard navigation

@@ -73,8 +73,14 @@ public class StandaloneFlipbookService {
             iconDataUri = "data:image/png;base64," + Base64.getEncoder().encodeToString(iconBytes);
         } catch (Exception ignored) {}
 
-        // Stream output directly via BufferedWriter to minimize memory overhead
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
+        // Stream output directly via BufferedWriter without closing the underlying stream
+        java.io.OutputStream nonClosingOs = new java.io.FilterOutputStream(os) {
+            @Override
+            public void close() throws IOException {
+                flush();
+            }
+        };
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(nonClosingOs, StandardCharsets.UTF_8))) {
             writer.write("<!DOCTYPE html>\n");
             writer.write("<html lang=\"en\">\n");
             writer.write("<head>\n");
@@ -91,9 +97,9 @@ public class StandaloneFlipbookService {
             writer.write("<body>\n");
             writer.write(getStandaloneHtmlBody(rawTitle, iconDataUri));
 
-            // Embed PDF.js Worker as text so it can be turned into a Blob URL offline
-            writer.write("\n  <!-- Embedded PDF.js Worker Code -->\n");
-            writer.write("  <script id=\"pdf-worker-code\" type=\"text/plain\">\n");
+            // Embed PDF.js Worker Core directly so pdfjsWorker is globally defined in-memory
+            writer.write("\n  <!-- Embedded PDF.js Worker Core -->\n");
+            writer.write("  <script>\n");
             writer.write(pdfWorkerJs);
             writer.write("\n  </script>\n");
 
@@ -138,6 +144,79 @@ public class StandaloneFlipbookService {
             writer.write("</html>\n");
             writer.flush();
         }
+    }
+
+    /**
+     * Generates a truly 100% offline standalone ZIP containing index.html (self-contained embedded PDF)
+     * and the original PDF for reference.
+     */
+    public void generateZip(String id, OutputStream os) throws IOException {
+        Path bookDir = converterService.getBookDir(id);
+        if (bookDir == null) {
+            throw new IOException("Flipbook not found.");
+        }
+        Path sourcePdf = converterService.getSourcePdf(id);
+        if (sourcePdf == null || !Files.exists(sourcePdf)) {
+            throw new IOException("Original source PDF not found for flipbook: " + id);
+        }
+
+        Map<String, Object> meta = converterService.meta(id);
+        String rawTitle = meta != null && meta.get("title") != null
+                ? (String) meta.get("title")
+                : "Flipbook";
+        String folderName = ConverterService.sanitizeForFilename(rawTitle) + "_Flipbook";
+
+        try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(os)) {
+            // 1. index.html (the standalone self-contained HTML flipbook)
+            java.util.zip.ZipEntry htmlEntry = new java.util.zip.ZipEntry(folderName + "/index.html");
+            zos.putNextEntry(htmlEntry);
+            generateStandaloneHtml(id, zos);
+            zos.closeEntry();
+
+            // 2. README.txt
+            java.util.zip.ZipEntry readmeEntry = new java.util.zip.ZipEntry(folderName + "/README.txt");
+            zos.putNextEntry(readmeEntry);
+            String readme = buildReadme(rawTitle, meta != null && meta.get("pages") != null ? ((Number) meta.get("pages")).intValue() : 0);
+            zos.write(readme.getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+
+            // 3. metadata.json
+            if (meta != null) {
+                java.util.zip.ZipEntry metaEntry = new java.util.zip.ZipEntry(folderName + "/metadata.json");
+                zos.putNextEntry(metaEntry);
+                zos.write(mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(meta));
+                zos.closeEntry();
+            }
+
+            // 4. Original source PDF
+            String originalName = meta != null && meta.get("filename") != null ? (String) meta.get("filename") : "source.pdf";
+            String safePdfName = ConverterService.sanitizeForFilename(originalName);
+            if (!safePdfName.toLowerCase().endsWith(".pdf")) safePdfName += ".pdf";
+            java.util.zip.ZipEntry pdfEntry = new java.util.zip.ZipEntry(folderName + "/" + safePdfName);
+            zos.putNextEntry(pdfEntry);
+            Files.copy(sourcePdf, zos);
+            zos.closeEntry();
+
+            zos.finish();
+        }
+    }
+
+    private String buildReadme(String title, int pageCount) {
+        return "========================================================\n"
+             + " " + title + " - Offline Flipbook\n"
+             + "========================================================\n\n"
+             + "Total Pages: " + pageCount + "\n\n"
+             + "HOW TO VIEW:\n"
+             + "1. Double-click 'index.html' to open this flipbook in Chrome, Edge, or any browser.\n"
+             + "2. No internet connection, server, or backend is required.\n"
+             + "3. The complete original PDF and reading engine are 100% bundled.\n\n"
+             + "NAVIGATION:\n"
+             + "- Click page corners or edges to turn pages with 3D animation\n"
+             + "- Use Left / Right arrow keys, Space, PageUp / PageDown\n"
+             + "- Use on-screen Prev / Next buttons\n"
+             + "- Click the page badge at the top to jump to any page\n"
+             + "- Toggle Fullscreen mode for distraction-free reading\n\n"
+             + "Created with Flip to Read.\n";
     }
 
     private byte[] loadResource(String path) throws IOException {
@@ -378,14 +457,15 @@ public class StandaloneFlipbookService {
 
     private String getStandaloneRunnerJs() {
         return """
-    const PLACEHOLDER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600'><rect width='100%' height='100%' fill='%23ffffff'/><text x='50%' y='50%' fill='%23a0b0b5' font-size='16' text-anchor='middle' font-family='sans-serif'>Loading...</text></svg>";
+    const PLACEHOLDER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='1100'><rect width='100%' height='100%' fill='%23ffffff'/><circle cx='400' cy='550' r='18' fill='none' stroke='%232a9d8f' stroke-width='3' stroke-dasharray='60 30'/><text x='400' y='600' fill='%23527179' font-size='15' text-anchor='middle' font-family='sans-serif'>Rendering...</text></svg>";
 
     let pdfDoc = null;
     let flip = null;
     let totalPages = 0;
-    let pageAspect = 0.75;
+    let pageAspect = 0.707;
     const renderCache = new Map();
     const renderTasks = new Map();
+    let renderQueue = Promise.resolve();
 
     const viewport = document.getElementById('viewport');
     const bookStage = document.getElementById('book-stage');
@@ -412,51 +492,78 @@ public class StandaloneFlipbookService {
       return bytes;
     }
 
-    async function renderPage(pageNum, targetW, targetH) {
+    async function doRenderPage(pageNum, targetW, targetH) {
+      const page = await pdfDoc.getPage(pageNum);
+      const unscaledVp = page.getViewport({ scale: 1.0 });
+
+      // High-resolution scale calculation: preserves crisp vector quality on high-DPI displays
+      const baseScale = targetW / unscaledVp.width;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+      const qualityMultiplier = Math.max(1.5, Math.min(dpr * 1.5, 2.5));
+      let scale = baseScale * qualityMultiplier;
+
+      let vp = page.getViewport({ scale: scale });
+      const MAX_CANVAS_DIM = 4096;
+      if (vp.width > MAX_CANVAS_DIM || vp.height > MAX_CANVAS_DIM) {
+        const cap = Math.min(MAX_CANVAS_DIM / vp.width, MAX_CANVAS_DIM / vp.height);
+        scale *= cap;
+        vp = page.getViewport({ scale: scale });
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(vp.width);
+      canvas.height = Math.round(vp.height);
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      await page.render({
+        canvasContext: ctx,
+        viewport: vp,
+        intent: 'display'
+      }).promise;
+
+      return canvas.toDataURL('image/jpeg', 0.94);
+    }
+
+    function renderPage(pageNum, targetW, targetH) {
       if (renderCache.has(pageNum)) {
-        return renderCache.get(pageNum);
+        return Promise.resolve(renderCache.get(pageNum));
       }
       if (renderTasks.has(pageNum)) {
         return renderTasks.get(pageNum);
       }
 
-      const task = (async () => {
-        try {
-          const page = await pdfDoc.getPage(pageNum);
-          const unscaledVp = page.getViewport({ scale: 1.0 });
-          const dpr = window.devicePixelRatio || 1;
-          const scale = (targetW / unscaledVp.width) * (dpr > 1.2 ? 1.5 : 1.35);
-          const vp = page.getViewport({ scale: scale });
+      const task = new Promise((resolve) => {
+        renderQueue = renderQueue.then(async () => {
+          if (renderCache.has(pageNum)) {
+            resolve(renderCache.get(pageNum));
+            return;
+          }
+          try {
+            const dataUrl = await doRenderPage(pageNum, targetW, targetH);
+            renderCache.set(pageNum, dataUrl);
 
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.round(vp.width);
-          canvas.height = Math.round(vp.height);
-          const ctx = canvas.getContext('2d', { alpha: false });
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          await page.render({ canvasContext: ctx, viewport: vp }).promise;
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-          renderCache.set(pageNum, dataUrl);
-          renderTasks.delete(pageNum);
-
-          // Capped LRU cache: keep closest 24 pages
-          if (renderCache.size > 28) {
-            const curr = (flip ? flip.getCurrentPageIndex() : 0) + 1;
-            for (let [k] of renderCache.entries()) {
-              if (Math.abs(k - curr) > 12) {
-                renderCache.delete(k);
+            // Bounded LRU cache: keep closest 24 pages
+            if (renderCache.size > 28) {
+              const curr = (flip ? flip.getCurrentPageIndex() : 0) + 1;
+              for (let [k] of renderCache.entries()) {
+                if (Math.abs(k - curr) > 12) {
+                  renderCache.delete(k);
+                }
               }
             }
+            resolve(dataUrl);
+          } catch (err) {
+            console.error('Failed to render page', pageNum, err);
+            resolve(PLACEHOLDER);
+          } finally {
+            renderTasks.delete(pageNum);
           }
-          return dataUrl;
-        } catch (err) {
-          console.error('Failed to render page', pageNum, err);
-          renderTasks.delete(pageNum);
-          return PLACEHOLDER;
-        }
-      })();
+        });
+      });
 
       renderTasks.set(pageNum, task);
       return task;
@@ -466,34 +573,63 @@ public class StandaloneFlipbookService {
       const collection = flip ? flip.getPageCollection() : null;
       if (!collection || !collection.pages) return;
       const pageObj = collection.pages[pageIndex];
-      if (!pageObj || !pageObj.image) return;
+      if (!pageObj) return;
 
-      if (pageObj.image.src !== dataUrl) {
-        pageObj.isLoad = false;
-        pageObj.image.onload = () => {
-          pageObj.isLoad = true;
-          if (flip && flip.render) {
-            flip.render.update();
-          }
-        };
-        pageObj.image.src = dataUrl;
+      if (pageObj.image && pageObj.image.src === dataUrl && pageObj.isLoad) {
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        pageObj.image = img;
+        pageObj.isLoad = true;
+      };
+      img.onerror = () => {
+        console.error('Image load failed for page index', pageIndex);
+        pageObj.isLoad = true;
+      };
+      img.src = dataUrl;
+      if (img.complete && img.naturalWidth > 0) {
+        pageObj.image = img;
+        pageObj.isLoad = true;
       }
     }
 
-    async function ensurePagesAround(pageIndex, targetW, targetH) {
-      const pageNumbers = [
-        pageIndex + 1,
-        pageIndex + 2,
-        pageIndex,
-        pageIndex + 3,
-        pageIndex - 1,
-        pageIndex + 4
-      ].filter(n => n >= 1 && n <= totalPages);
+    function getSpreadPages(pageIndex) {
+      if (!flip || !flip.getPageCollection()) return [pageIndex + 1];
+      const col = flip.getPageCollection();
+      const spIdx = col.getSpreadIndexByPage(pageIndex);
+      if (spIdx !== null && col.getSpread && col.getSpread()[spIdx]) {
+        return col.getSpread()[spIdx].map(i => i + 1);
+      }
+      return [pageIndex + 1];
+    }
 
-      for (const pNum of pageNumbers) {
-        renderPage(pNum, targetW, targetH).then(dataUrl => {
-          applyPageImageToFlip(pNum - 1, dataUrl);
-        });
+    async function warmPagesAround(pageIndex, targetW, targetH) {
+      const pagesToWarm = new Set();
+
+      // Current spread
+      getSpreadPages(pageIndex).forEach(p => pagesToWarm.add(p));
+
+      // Next spread (+1)
+      if (pageIndex + 2 < totalPages) {
+        getSpreadPages(pageIndex + 2).forEach(p => pagesToWarm.add(p));
+      }
+      // Previous spread (-1)
+      if (pageIndex - 1 >= 0) {
+        getSpreadPages(pageIndex - 1).forEach(p => pagesToWarm.add(p));
+      }
+      // Spread (+2)
+      if (pageIndex + 4 < totalPages) {
+        getSpreadPages(pageIndex + 4).forEach(p => pagesToWarm.add(p));
+      }
+
+      for (const pNum of pagesToWarm) {
+        if (pNum >= 1 && pNum <= totalPages) {
+          renderPage(pNum, targetW, targetH).then(dataUrl => {
+            applyPageImageToFlip(pNum - 1, dataUrl);
+          });
+        }
       }
     }
 
@@ -543,7 +679,7 @@ public class StandaloneFlipbookService {
       btnNext.disabled = idx >= totalPages - 1;
 
       const dims = calcDimensions();
-      ensurePagesAround(idx, dims.width, dims.height);
+      warmPagesAround(idx, dims.width, dims.height);
     }
 
     async function initFlipbook(startIdx = 0) {
@@ -565,15 +701,12 @@ public class StandaloneFlipbookService {
       // Populate array of placeholders for all pages
       const initialPages = new Array(totalPages).fill(PLACEHOLDER);
 
-      // Pre-render current page + neighbor immediately
-      const p1 = Math.min(startIdx + 1, totalPages);
-      const p1Data = await renderPage(p1, dims.width, dims.height);
-      initialPages[p1 - 1] = p1Data;
-
-      if (p1 + 1 <= totalPages) {
-        const p2Data = await renderPage(p1 + 1, dims.width, dims.height);
-        initialPages[p1] = p2Data;
-      }
+      // Pre-render starting spread immediately so first view is instant
+      const startSpread = getSpreadPages(startIdx);
+      await Promise.all(startSpread.map(async (p) => {
+        const dataUrl = await renderPage(p, dims.width, dims.height);
+        initialPages[p - 1] = dataUrl;
+      }));
 
       flip.loadFromImages(initialPages);
 
@@ -586,8 +719,27 @@ public class StandaloneFlipbookService {
       });
     }
 
-    btnPrev.onclick = () => { if (flip) flip.flipPrev(); };
-    btnNext.onclick = () => { if (flip) flip.flipNext(); };
+    btnPrev.onclick = () => {
+      if (!flip) return;
+      const idx = flip.getCurrentPageIndex() || 0;
+      if (idx > 0) {
+        const dims = calcDimensions();
+        const prevPages = getSpreadPages(Math.max(0, idx - 2));
+        prevPages.forEach(p => renderPage(p, dims.width, dims.height).then(dataUrl => applyPageImageToFlip(p - 1, dataUrl)));
+        flip.flipPrev();
+      }
+    };
+
+    btnNext.onclick = () => {
+      if (!flip) return;
+      const idx = flip.getCurrentPageIndex() || 0;
+      if (idx < totalPages - 1) {
+        const dims = calcDimensions();
+        const nextPages = getSpreadPages(Math.min(totalPages - 1, idx + 2));
+        nextPages.forEach(p => renderPage(p, dims.width, dims.height).then(dataUrl => applyPageImageToFlip(p - 1, dataUrl)));
+        flip.flipNext();
+      }
+    };
 
     btnPageBadge.onclick = (e) => {
       e.stopPropagation();
@@ -608,17 +760,25 @@ public class StandaloneFlipbookService {
 
     async function performJump() {
       const target = parseInt(jumpInput.value, 10);
-      if (!isNaN(target) && target >= 1 && target <= totalPages) {
-        jumpPopover.classList.remove('active');
-        const dims = calcDimensions();
-        // Pre-render target page before turning
-        renderPage(target, dims.width, dims.height).then(dataUrl => {
-          applyPageImageToFlip(target - 1, dataUrl);
-          if (flip) flip.flip(target - 1);
-        });
-      } else {
+      if (isNaN(target) || target < 1 || target > totalPages) {
         jumpInput.style.borderColor = 'var(--accent)';
         setTimeout(() => { jumpInput.style.borderColor = ''; }, 1000);
+        return;
+      }
+      jumpPopover.classList.remove('active');
+      const targetIdx = target - 1;
+      const dims = calcDimensions();
+
+      // Find all pages on target spread
+      const targetPages = getSpreadPages(targetIdx);
+
+      // Pre-render destination spread so it is ready BEFORE flipping
+      await Promise.all(targetPages.map(p => renderPage(p, dims.width, dims.height).then(dataUrl => {
+        applyPageImageToFlip(p - 1, dataUrl);
+      })));
+
+      if (flip) {
+        flip.flip(targetIdx);
       }
     }
 
@@ -635,13 +795,35 @@ public class StandaloneFlipbookService {
         return;
       }
       if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        if (flip) flip.flipPrev();
+        if (flip) {
+          const idx = flip.getCurrentPageIndex() || 0;
+          if (idx > 0) {
+            const dims = calcDimensions();
+            const prevPages = getSpreadPages(Math.max(0, idx - 2));
+            prevPages.forEach(p => renderPage(p, dims.width, dims.height).then(dataUrl => applyPageImageToFlip(p - 1, dataUrl)));
+            flip.flipPrev();
+          }
+        }
       } else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-        if (flip) flip.flipNext();
+        if (flip) {
+          const idx = flip.getCurrentPageIndex() || 0;
+          if (idx < totalPages - 1) {
+            const dims = calcDimensions();
+            const nextPages = getSpreadPages(Math.min(totalPages - 1, idx + 2));
+            nextPages.forEach(p => renderPage(p, dims.width, dims.height).then(dataUrl => applyPageImageToFlip(p - 1, dataUrl)));
+            flip.flipNext();
+          }
+        }
       } else if (e.key === 'Home') {
-        if (flip) flip.flip(0);
+        if (flip) {
+          jumpInput.value = 1;
+          performJump();
+        }
       } else if (e.key === 'End') {
-        if (flip) flip.flip(totalPages - 1);
+        if (flip) {
+          jumpInput.value = totalPages;
+          performJump();
+        }
       }
     });
 
@@ -673,16 +855,19 @@ public class StandaloneFlipbookService {
         loadingLabel.textContent = 'Decoding PDF document...';
         const pdfData = base64ToUint8Array(pdfBase64);
 
-        try {
-          const workerCode = document.getElementById('pdf-worker-code').textContent;
-          const blob = new Blob([workerCode], { type: 'application/javascript' });
-          pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-        } catch (wErr) {
-          console.warn('Worker blob setup warning, proceeding with fallback:', wErr);
+        // Configure PDF.js worker: when under file:///, disable worker thread to avoid origin 'null' restrictions
+        const isFileOrigin = window.location.protocol === 'file:';
+        if (isFileOrigin && window.pdfjsLib && window.pdfjsLib.PDFWorkerUtil) {
+          window.pdfjsLib.PDFWorkerUtil.isWorkerDisabled = true;
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
         }
 
         loadingLabel.textContent = 'Reading pages...';
-        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+        const loadingTask = pdfjsLib.getDocument({
+          data: pdfData,
+          isEvalSupported: true,
+          useSystemFonts: true
+        });
         pdfDoc = await loadingTask.promise;
         totalPages = pdfDoc.numPages;
 
@@ -695,8 +880,15 @@ public class StandaloneFlipbookService {
         loadingLabel.textContent = 'Rendering flipbook...';
         await initFlipbook(0);
       } catch (err) {
-        loadingLabel.textContent = 'Failed to load flipbook: ' + err.message;
         console.error('Initialization error:', err);
+        loading.innerHTML = `
+          <div style="background: #ffffff; padding: 24px 32px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); text-align: center; max-width: 420px;">
+            <div style="color: #E76F51; font-size: 28px; margin-bottom: 8px;">&#9888;</div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: #264653; margin-bottom: 8px;">Unable to Load Flipbook</div>
+            <div style="color: #527179; font-size: 0.9rem; margin-bottom: 16px;">${err.message || 'An error occurred while loading the PDF document.'}</div>
+            <button onclick="window.location.reload()" style="background: #2A9D8F; color: #fff; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 600; cursor: pointer;">Reload Book</button>
+          </div>
+        `;
       }
     }
 

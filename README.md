@@ -230,6 +230,67 @@ Once started, the web application is live at **http://localhost:8080**.
 
 ---
 
+### Docker Deployment (Containerized Run)
+
+Flip to Read provides a production-grade multi-stage `Dockerfile` and `docker-compose.yml` packaging Java 21, Spring Boot, Python 3, PyMuPDF, and the bundled frontend into a single self-contained, non-root runtime container.
+
+#### Prerequisites
+- **Docker Engine** (20.10+) or **Docker Desktop**
+- **Docker Compose** (v2+)
+
+#### Option A: Docker Compose (Quickest)
+```bash
+# Start container in detached mode
+docker compose up -d
+
+# View live logs
+docker compose logs -f
+
+# Stop container
+docker compose down
+```
+
+#### Option B: Docker CLI
+```bash
+# Build the production image
+docker build -t flip-to-read .
+
+# Run the container
+docker run -d \
+  --name flip-to-read \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e APP_DPI=110 \
+  -e MAX_FILE_SIZE=50MB \
+  flip-to-read
+```
+
+#### Configurable Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `8080` | HTTP port on which Spring Boot listens |
+| `PYTHON_CMD` | `python3` (container) / `python` (local) | Python executable name or path |
+| `PYTHON_SCRIPT` | `python-service/convert.py` | Path to PyMuPDF conversion script |
+| `STORAGE_DIR` | `/app/storage/books` | Path to temporary writable book storage directory |
+| `APP_DPI` | `110` | PDF page rendering raster resolution (DPI) |
+| `MAX_FILE_SIZE` | `50MB` | Maximum allowed individual upload file size |
+| `MAX_REQUEST_SIZE` | `50MB` | Maximum allowed multipart request size |
+| `CORS_ALLOWED_ORIGINS` | *(empty)* | Optional comma-separated additional CORS origins (e.g. `https://yourdomain.com`) |
+
+#### Temporary Storage Behavior
+- Books and rendered page textures are written to `STORAGE_DIR` (`storage/books`).
+- The built-in Spring Boot scheduled worker automatically purges books older than 15 minutes every 60 seconds.
+- No external database or persistent cloud volume is required.
+
+#### Production Deployment Note
+- The final runtime image runs under an unprivileged user (`appuser`, UID 10001).
+- Container health is monitored via `curl -f http://localhost:${PORT}/`.
+- On cloud container platforms (AWS ECS, GCP Cloud Run, DigitalOcean App Platform, Render), set the container port to `$PORT` and configure `CORS_ALLOWED_ORIGINS` with your public front-facing domain.
+
+
+---
+
 ### Step 4: Build the Browser Extension
 
 In a separate terminal, install dependencies, typecheck, and bundle the extension:
@@ -349,7 +410,7 @@ For comprehensive architectural specifications, refer to [docs/extension-archite
 
 ## Roadmap
 
-- [ ] Production cloud deployment configurations (Dockerfile & Docker Compose)
+- [x] Production cloud deployment configurations (Dockerfile & Docker Compose)
 - [ ] Chrome Web Store & Edge Add-ons official store listings
 - [ ] Automated CI/CD pipeline for Maven packaging and TypeScript typechecking
 - [ ] Bookmark annotation and text search within the flipbook reader

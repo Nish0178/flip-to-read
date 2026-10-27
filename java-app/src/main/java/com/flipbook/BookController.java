@@ -99,9 +99,10 @@ public class BookController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Flipbook not found"));
             }
             int pageCount = meta.get("pages") instanceof Number ? ((Number) meta.get("pages")).intValue() : 0;
+            String fmt = (meta.get("format") != null) ? (String) meta.get("format") : "jpg";
             List<String> pageList = new ArrayList<>();
             for (int i = 1; i <= pageCount; i++) {
-                pageList.add("/books/" + id + "/page-" + i + ".jpg");
+                pageList.add("/books/" + id + "/page-" + i + "." + fmt);
             }
             return ResponseEntity.ok(Map.of(
                     "id", id,
@@ -181,7 +182,7 @@ public class BookController {
 
             response.setContentType("application/zip");
             response.setHeader(HttpHeaders.CONTENT_DISPOSITION, disposition.toString());
-            service.generateZip(id, response.getOutputStream());
+            standaloneService.generateZip(id, response.getOutputStream());
             response.flushBuffer();
         } catch (Exception e) {
             if (!response.isCommitted()) {

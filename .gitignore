@@ -25,6 +25,10 @@ generated/
 # Temporary / test document formats
 *.pdf
 *.zip
+*_standalone*.html
+extracted_*/
+test_extracted_*/
+temp_*/
 
 # Operating system & editor files
 .DS_Store

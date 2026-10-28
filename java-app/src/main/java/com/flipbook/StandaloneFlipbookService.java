@@ -496,11 +496,11 @@ public class StandaloneFlipbookService {
       const page = await pdfDoc.getPage(pageNum);
       const unscaledVp = page.getViewport({ scale: 1.0 });
 
-      // High-resolution scale calculation: preserves crisp vector quality on high-DPI displays
+      // High-resolution scale calculation: preserves crisp vector quality on all displays
+      const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 3);
       const baseScale = targetW / unscaledVp.width;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-      const qualityMultiplier = Math.max(1.5, Math.min(dpr * 1.5, 2.5));
-      let scale = baseScale * qualityMultiplier;
+      // Quality multiplier: 2.0x display resolution, ensuring minimum scale of 2.2 (~160-200 DPI minimum)
+      let scale = Math.max(baseScale * dpr * 2.0, 2.2);
 
       let vp = page.getViewport({ scale: scale });
       const MAX_CANVAS_DIM = 4096;
@@ -525,7 +525,9 @@ public class StandaloneFlipbookService {
         intent: 'display'
       }).promise;
 
-      return canvas.toDataURL('image/jpeg', 0.94);
+      console.log(`[Diagnostic] Page ${pageNum}: PDF page size: ${Math.round(unscaledVp.width)}x${Math.round(unscaledVp.height)}, viewport: ${Math.round(vp.width)}x${Math.round(vp.height)}, dpr: ${dpr}, render scale: ${scale.toFixed(2)}, canvas backing: ${canvas.width}x${canvas.height}, target display: ${Math.round(targetW)}x${Math.round(targetH)}`);
+
+      return canvas;
     }
 
     function renderPage(pageNum, targetW, targetH) {
@@ -543,19 +545,23 @@ public class StandaloneFlipbookService {
             return;
           }
           try {
-            const dataUrl = await doRenderPage(pageNum, targetW, targetH);
-            renderCache.set(pageNum, dataUrl);
+            const canvas = await doRenderPage(pageNum, targetW, targetH);
+            renderCache.set(pageNum, canvas);
 
             // Bounded LRU cache: keep closest 24 pages
-            if (renderCache.size > 28) {
+            if (renderCache.size > 24) {
               const curr = (flip ? flip.getCurrentPageIndex() : 0) + 1;
-              for (let [k] of renderCache.entries()) {
-                if (Math.abs(k - curr) > 12) {
+              for (let [k, c] of renderCache.entries()) {
+                if (Math.abs(k - curr) > 10) {
+                  if (typeof HTMLCanvasElement !== 'undefined' && c instanceof HTMLCanvasElement) {
+                    c.width = 1;
+                    c.height = 1;
+                  }
                   renderCache.delete(k);
                 }
               }
             }
-            resolve(dataUrl);
+            resolve(canvas);
           } catch (err) {
             console.error('Failed to render page', pageNum, err);
             resolve(PLACEHOLDER);
@@ -569,29 +575,41 @@ public class StandaloneFlipbookService {
       return task;
     }
 
-    function applyPageImageToFlip(pageIndex, dataUrl) {
+    function applyPageImageToFlip(pageIndex, source) {
       const collection = flip ? flip.getPageCollection() : null;
       if (!collection || !collection.pages) return;
       const pageObj = collection.pages[pageIndex];
       if (!pageObj) return;
 
-      if (pageObj.image && pageObj.image.src === dataUrl && pageObj.isLoad) {
+      if (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
+        if (pageObj.image === source && pageObj.isLoad) return;
+        pageObj.image = source;
+        pageObj.isLoad = true;
+        if (flip.getRender()) flip.getRender().drawFrame();
         return;
       }
 
-      const img = new Image();
-      img.onload = () => {
-        pageObj.image = img;
-        pageObj.isLoad = true;
-      };
-      img.onerror = () => {
-        console.error('Image load failed for page index', pageIndex);
-        pageObj.isLoad = true;
-      };
-      img.src = dataUrl;
-      if (img.complete && img.naturalWidth > 0) {
-        pageObj.image = img;
-        pageObj.isLoad = true;
+      if (typeof source === 'string') {
+        if (pageObj.image && pageObj.image.src === source && pageObj.isLoad) {
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          pageObj.image = img;
+          pageObj.isLoad = true;
+          if (flip.getRender()) flip.getRender().drawFrame();
+        };
+        img.onerror = () => {
+          console.error('Image load failed for page index', pageIndex);
+          pageObj.isLoad = true;
+        };
+        img.src = source;
+        if (img.complete && img.naturalWidth > 0) {
+          pageObj.image = img;
+          pageObj.isLoad = true;
+          if (flip.getRender()) flip.getRender().drawFrame();
+        }
       }
     }
 
@@ -860,6 +878,9 @@ public class StandaloneFlipbookService {
         if (isFileOrigin && window.pdfjsLib && window.pdfjsLib.PDFWorkerUtil) {
           window.pdfjsLib.PDFWorkerUtil.isWorkerDisabled = true;
           pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        }
+        if (window.pdfjsLib) {
+          pdfjsLib.verbosity = 0;
         }
 
         loadingLabel.textContent = 'Reading pages...';

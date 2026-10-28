@@ -314,9 +314,23 @@ docker run -d \
 
 ---
 
-### Step 4: Build the Browser Extension
+### Step 4: Install or Build the Browser Extension
 
-In a separate terminal, install dependencies, typecheck, and bundle the extension:
+#### Option A: Quick User Installation (Windows Setup)
+For regular users on Windows, Flip to Read provides an automated desktop setup helper:
+1. On the web platform, click **Get Extension** and download **`FlipToRead-Extension-Setup.exe`** (362 KB).
+2. Run the downloaded setup. It safely extracts the extension into `%LOCALAPPDATA%\FlipToRead\extension`, pre-copies the directory path to your clipboard, and automatically opens Google Chrome to `chrome://extensions`.
+3. In Chrome:
+   - Toggle **Developer mode** ON (top-right corner).
+   - Click **Load unpacked** (top-left toolbar).
+   - Press **Ctrl + V** in the folder dialog and click **Select Folder** (the path is pre-copied).
+4. Pin **Flip to Read** to your toolbar.
+
+> **Why is "Load unpacked" required?**  
+> Google Chrome strictly enforces an anti-sideloading policy that prevents any third-party desktop installer from silently injecting off-store extensions on consumer PCs. To keep Flip to Read **100% free (₹0)** without paying Chrome Web Store publisher fees and without abusing enterprise policy registry keys (which trigger antivirus malware warnings), Chrome requires this explicit one-time developer mode authorization.
+
+#### Option B: Developer Build from Source
+If you are developing, modifying TypeScript source files, or on Linux/macOS:
 
 ```bash
 cd extension
@@ -325,19 +339,13 @@ npm run typecheck
 npm run build
 ```
 
-The compiled, ready-to-load extension will be generated in `extension/dist/`.
+The compiled extension will be output to `extension/dist/`. Load `extension/dist/` into `chrome://extensions` or `edge://extensions` via **Load unpacked**.
 
-#### Installing in Chrome:
-1. Open `chrome://extensions` in Google Chrome.
-2. Toggle on **Developer mode** (top-right corner).
-3. Click **Load unpacked** (top-left toolbar).
-4. Select the `extension/dist` directory.
-5. Pin **Flip to Read** to your toolbar.
-
-#### Installing in Microsoft Edge:
-1. Open `edge://extensions` in Microsoft Edge.
-2. Enable **Developer mode** (left sidebar).
-3. Click **Load unpacked** and select `extension/dist`.
+To re-package the standalone Windows installer at any time from repository root:
+```bash
+python scripts/build_installer.py
+```
+This packages `extension/dist` into `java-app/src/main/resources/static/FlipToRead-Extension-Setup.exe`.
 
 > For complete technical details on Manifest V3 permissions, service worker message routing, passive PDF detection, and storage schemas, read the [Extension Architecture Documentation](docs/extension-architecture.md).
 

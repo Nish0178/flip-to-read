@@ -285,37 +285,56 @@
   <div class="modal-backdrop" id="extension-modal">
     <div class="modal-box">
       <button type="button" class="modal-close" id="btn-close-modal" aria-label="Close modal">&times;</button>
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 1.8rem;">🧩</span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 2rem;">🧩</span>
         <div>
-          <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-main);">Install Flip to Read Extension</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Chrome &bull; Edge &bull; Brave &bull; Opera</span>
+          <h3 style="font-size: 1.18rem; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">Install Flip to Read Extension</h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Windows &bull; Chrome &bull; Edge &bull; Brave</span>
         </div>
       </div>
       <div style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
-        The Flip to Read browser extension lets you detect online PDFs, convert them with one click, and read them with realistic page flips.
+        Download the Windows setup file. Run it once and we'll prepare the extension for Chrome.
       </div>
-      <div class="install-step-list">
-        <div class="install-step-item">
-          <div class="install-step-num">1</div>
-          <div>Build the extension using <code>npm run build</code> in the <code>extension/</code> directory.</div>
-        </div>
-        <div class="install-step-item">
-          <div class="install-step-num">2</div>
-          <div>Open <code>chrome://extensions</code> or <code>edge://extensions</code> in your browser.</div>
-        </div>
-        <div class="install-step-item">
-          <div class="install-step-num">3</div>
-          <div>Turn on <strong>Developer mode</strong> in the top-right corner.</div>
-        </div>
-        <div class="install-step-item">
-          <div class="install-step-num">4</div>
-          <div>Click <strong>Load unpacked</strong> and select the <code>extension/dist</code> folder.</div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin: 4px 0;">
+        <a href="/FlipToRead-Extension-Setup.exe" download="FlipToRead-Extension-Setup.exe" class="btn-create" id="btn-download-setup" style="text-decoration: none; justify-content: center; gap: 8px; padding: 12px 20px; font-size: 0.95rem; font-weight: 700;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+          </svg>
+          <span>Download Windows Setup</span>
+        </a>
+        <div style="font-size: 0.76rem; color: var(--text-muted); text-align: center;">
+          Standalone executable (362 KB) &bull; Zero external runtime needed &bull; 100% Free
         </div>
       </div>
-      <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-        <button type="button" class="btn-create" id="btn-modal-got-it" style="padding: 8px 18px; font-size: 0.86rem;">
-          Got it
+
+      <div style="background: #f4f8f7; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 16px;">
+        <div style="font-size: 0.84rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
+          Next:
+        </div>
+        <div class="install-step-list">
+          <div class="install-step-item">
+            <div class="install-step-num">1</div>
+            <div>Run the downloaded setup (<code>FlipToRead-Extension-Setup.exe</code>).</div>
+          </div>
+          <div class="install-step-item">
+            <div class="install-step-num">2</div>
+            <div>Turn <strong>ON</strong> Developer mode (toggle in top-right of Chrome).</div>
+          </div>
+          <div class="install-step-item">
+            <div class="install-step-num">3</div>
+            <div>Click <strong>Load unpacked</strong> (top-left toolbar).</div>
+          </div>
+          <div class="install-step-item">
+            <div class="install-step-num">4</div>
+            <div>Press <strong>Ctrl + V</strong> and select the folder (path is pre-copied!).</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+        <button type="button" class="btn-url-convert" id="btn-modal-got-it" style="padding: 7px 18px; font-size: 0.84rem; background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border-subtle); cursor: pointer;">
+          Close
         </button>
       </div>
     </div>

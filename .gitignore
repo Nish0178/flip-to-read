@@ -35,3 +35,6 @@ temp_*/
 Thumbs.db
 *.log
 .agent/
+.idea/
+.vscode/
+*.iml

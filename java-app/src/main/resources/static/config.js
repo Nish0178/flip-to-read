@@ -16,11 +16,9 @@
 
   // =========================================================================
   // PRODUCTION BACKEND URL CONFIGURATION
-  // Set this to your actual Render Web Service URL when deploying as a Static Site.
-  // Example: 'https://<your-service-name>.onrender.com'
-  // Leave empty ('') for same-origin / local development.
+  // Set to the real Render Web Service URL for decoupled Static Site deployment.
   // =========================================================================
-  var BACKEND_API_URL = '';
+  var BACKEND_API_URL = 'https://flip-to-read.onrender.com';
 
   function resolveApiBaseUrl() {
     var win = typeof window !== 'undefined' ? window : global;
@@ -52,24 +50,27 @@
       }
     } catch (e) {}
 
-    // 4. Configured constant
-    if (BACKEND_API_URL && BACKEND_API_URL.trim() !== '') {
-      return BACKEND_API_URL.trim().replace(/\/+$/, '');
-    }
-
-    // 5. Same origin / local fallback
-    // If frontend is running on a different port locally (e.g. localhost:3000)
-    // while backend is on 8080, allow automatic local connection:
+    // 4. Same origin / local development fallback
+    // Always preserve local development behavior (e.g. localhost:8080 or localhost:3000)
+    // so local runs never inadvertently call the remote production backend.
     try {
       var loc = win && win.location ? win.location : (typeof location !== 'undefined' ? location : null);
       if (loc) {
         var host = loc.hostname;
         var port = loc.port;
-        if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '8080' && port !== '') {
-          return 'http://' + host + ':8080';
+        if (host === 'localhost' || host === '127.0.0.1') {
+          if (port && port !== '8080' && port !== '') {
+            return 'http://' + host + ':8080';
+          }
+          return '';
         }
       }
     } catch (e) {}
+
+    // 5. Configured constant for production Static Site deployment
+    if (BACKEND_API_URL && BACKEND_API_URL.trim() !== '') {
+      return BACKEND_API_URL.trim().replace(/\/+$/, '');
+    }
 
     return '';
   }

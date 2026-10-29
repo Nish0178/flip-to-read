@@ -316,21 +316,22 @@ docker run -d \
 
 ### Step 4: Install or Build the Browser Extension
 
-#### Option A: Quick User Installation (Windows Setup)
-For regular users on Windows, Flip to Read provides an automated desktop setup helper:
-1. On the web platform, click **Get Extension** and download **`FlipToRead-Extension-Setup.exe`** (362 KB).
-2. Run the downloaded setup. It safely extracts the extension into `%LOCALAPPDATA%\FlipToRead\extension`, pre-copies the directory path to your clipboard, and automatically opens Google Chrome to `chrome://extensions`.
-3. In Chrome:
-   - Toggle **Developer mode** ON (top-right corner).
+#### Option A: Quick Installation (Recommended — Production ZIP)
+For users on Chrome, Microsoft Edge, and Brave (Windows, macOS, Linux):
+1. On the web platform, click **Get Extension** and download **`flip-to-read-extension.zip`** (252 KB), or download it directly from `/flip-to-read-extension.zip`.
+2. **Extract the ZIP** archive to a permanent folder on your computer (e.g. right-click &rarr; **Extract All...** on Windows).
+3. In your browser:
+   - Navigate to `chrome://extensions` (or `edge://extensions` for Edge, `brave://extensions` for Brave).
+   - Toggle **Developer mode** ON (switch in top-right corner).
    - Click **Load unpacked** (top-left toolbar).
-   - Press **Ctrl + V** in the folder dialog and click **Select Folder** (the path is pre-copied).
-4. Pin **Flip to Read** to your toolbar.
+   - Select the extracted `flip-to-read-extension` folder (which directly contains `manifest.json`).
+4. Pin **Flip to Read** to your toolbar for instant 1-click access.
 
 > **Why is "Load unpacked" required?**  
-> Google Chrome strictly enforces an anti-sideloading policy that prevents any third-party desktop installer from silently injecting off-store extensions on consumer PCs. To keep Flip to Read **100% free (₹0)** without paying Chrome Web Store publisher fees and without abusing enterprise policy registry keys (which trigger antivirus malware warnings), Chrome requires this explicit one-time developer mode authorization.
+> Modern Chromium browsers enforce policies requiring off-store extensions to be authorized via Developer mode. Using the clean ZIP package distribution ensures Flip to Read is **100% free (₹0)**, avoids developer store publisher fees, avoids unsigned desktop executable warnings (such as Windows Smart App Control), and requires zero registry or policy modifications.
 
 #### Option B: Developer Build from Source
-If you are developing, modifying TypeScript source files, or on Linux/macOS:
+If you are developing, modifying TypeScript source files, or customizing the extension:
 
 ```bash
 cd extension
@@ -341,11 +342,11 @@ npm run build
 
 The compiled extension will be output to `extension/dist/`. Load `extension/dist/` into `chrome://extensions` or `edge://extensions` via **Load unpacked**.
 
-To re-package the standalone Windows installer at any time from repository root:
+To package the production ZIP distribution package at any time from repository root:
 ```bash
-python scripts/build_installer.py
+python scripts/build_extension_zip.py
 ```
-This packages `extension/dist` into `java-app/src/main/resources/static/FlipToRead-Extension-Setup.exe`.
+This validates Manifest V3 compliance and packages `extension/dist` into `java-app/src/main/resources/static/flip-to-read-extension.zip` for direct serving by the Spring Boot static resource pipeline.
 
 > For complete technical details on Manifest V3 permissions, service worker message routing, passive PDF detection, and storage schemas, read the [Extension Architecture Documentation](docs/extension-architecture.md).
 

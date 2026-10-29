@@ -42,5 +42,6 @@ generated/
 *.log
 *.pdf
 *.zip
+!java-app/src/main/resources/static/flip-to-read-extension.zip
 scratch/
 test-results/

@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="logo-icon.png">
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
   <style>
     .resume-toast {
       position: absolute;
@@ -255,9 +256,9 @@
       }
 
       // Configure download links
-      downloadPdfLink.href = '/api/books/' + encodeURIComponent(id) + '/pdf';
-      downloadHtmlLink.href = '/api/books/' + encodeURIComponent(id) + '/flipbook';
-      downloadZipLink.href = '/api/books/' + encodeURIComponent(id) + '/download';
+      downloadPdfLink.href = getFlipApiUrl('/api/books/' + encodeURIComponent(id) + '/pdf');
+      downloadHtmlLink.href = getFlipApiUrl('/api/books/' + encodeURIComponent(id) + '/flipbook');
+      downloadZipLink.href = getFlipApiUrl('/api/books/' + encodeURIComponent(id) + '/download');
 
       // Download dropdown toggling
       btnDownloadMenu.addEventListener('click', (e) => {
@@ -380,7 +381,7 @@
             } catch (err) {
               console.error('Failed to render page', pageNum, err);
               const fmt = bookMeta.format || 'jpg';
-              resolve(`/books/${id}/page-${pageNum}.${fmt}`);
+              resolve(getFlipApiUrl(`/books/${id}/page-${pageNum}.${fmt}`));
             } finally {
               renderTasks.delete(pageNum);
             }
@@ -518,8 +519,14 @@
 
       // Initialize reader
       async function init() {
+        const loadingText = document.getElementById('loading-text');
+        const wakeupTimer = setTimeout(() => {
+          if (loadingText) loadingText.textContent = "Connecting to backend (waking up if idle)...";
+        }, 4000);
+
         try {
-          const res = await fetch('/api/books/' + encodeURIComponent(id));
+          const res = await fetch(getFlipApiUrl('/api/books/' + encodeURIComponent(id)));
+          clearTimeout(wakeupTimer);
           if (!res.ok) {
             throw new Error("This flipbook could not be found or has expired.");
           }
@@ -542,7 +549,7 @@
             try {
               pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
               const loadingTask = pdfjsLib.getDocument({
-                url: '/api/books/' + encodeURIComponent(id) + '/pdf',
+                url: getFlipApiUrl('/api/books/' + encodeURIComponent(id) + '/pdf'),
                 isEvalSupported: true,
                 useSystemFonts: true
               });
@@ -690,7 +697,7 @@
           flip.loadFromImages(initialPages);
         } else {
           const fmt = bookMeta.format || 'jpg';
-          const pages = Array.from({ length: bookMeta.pages }, (_, i) => `/books/${id}/page-${i + 1}.${fmt}`);
+          const pages = Array.from({ length: bookMeta.pages }, (_, i) => getFlipApiUrl(`/books/${id}/page-${i + 1}.${fmt}`));
           flip.loadFromImages(pages);
         }
 

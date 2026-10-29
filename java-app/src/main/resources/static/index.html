@@ -8,6 +8,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="logo-icon.png">
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
 </head>
 <body class="landing-body">
 
@@ -289,46 +290,45 @@
         <span style="font-size: 2rem;">🧩</span>
         <div>
           <h3 style="font-size: 1.18rem; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">Install Flip to Read Extension</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Windows &bull; Chrome &bull; Edge &bull; Brave</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Chrome &bull; Edge &bull; Brave &bull; All Platforms</span>
         </div>
       </div>
       <div style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
-        Download the Windows setup file. Run it once and we'll prepare the extension for Chrome.
+        Transform online PDFs and web documents into realistic 3D flipbooks directly from your browser.
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 8px; margin: 4px 0;">
-        <a href="/FlipToRead-Extension-Setup.exe" download="FlipToRead-Extension-Setup.exe" class="btn-create" id="btn-download-setup" style="text-decoration: none; justify-content: center; gap: 8px; padding: 12px 20px; font-size: 0.95rem; font-weight: 700;">
+        <a href="/flip-to-read-extension.zip" download="flip-to-read-extension.zip" class="btn-create" id="btn-download-extension" style="text-decoration: none; justify-content: center; gap: 8px; padding: 12px 20px; font-size: 0.95rem; font-weight: 700;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
           </svg>
-          <span>Download Windows Setup</span>
+          <span>Download Extension (ZIP)</span>
         </a>
         <div style="font-size: 0.76rem; color: var(--text-muted); text-align: center;">
-          Standalone executable (362 KB) &bull; Zero external runtime needed &bull; 100% Free
+          Clean ZIP package (252 KB) &bull; Official Manifest V3 &bull; 100% Free
         </div>
       </div>
 
       <div style="background: #f4f8f7; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 16px;">
         <div style="font-size: 0.84rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
-          Next:
+          3 Simple Steps to Install:
         </div>
         <div class="install-step-list">
           <div class="install-step-item">
             <div class="install-step-num">1</div>
-            <div>Run the downloaded setup (<code>FlipToRead-Extension-Setup.exe</code>).</div>
+            <div><strong>Download and Extract</strong> the ZIP archive to a folder (right-click &rarr; <em>Extract All...</em>).</div>
           </div>
           <div class="install-step-item">
             <div class="install-step-num">2</div>
-            <div>Turn <strong>ON</strong> Developer mode (toggle in top-right of Chrome).</div>
+            <div>Open Chrome to <code style="user-select: all; background: #e8f3f0; padding: 1px 6px; border-radius: 4px; font-size: 0.85em;">chrome://extensions</code> and enable <strong>Developer mode</strong> (toggle in top-right).</div>
           </div>
           <div class="install-step-item">
             <div class="install-step-num">3</div>
-            <div>Click <strong>Load unpacked</strong> (top-left toolbar).</div>
+            <div>Click <strong>Load unpacked</strong> (top-left) and select the extracted extension folder.</div>
           </div>
-          <div class="install-step-item">
-            <div class="install-step-num">4</div>
-            <div>Press <strong>Ctrl + V</strong> and select the folder (path is pre-copied!).</div>
-          </div>
+        </div>
+        <div style="margin-top: 10px; padding: 8px 12px; background: #eaf5f2; border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--teal-dark); display: flex; align-items: center; gap: 6px;">
+          <span>💡</span><span>Tip: Pin <strong>Flip to Read</strong> to your browser toolbar for instant 1-click reading.</span>
         </div>
       </div>
 
@@ -532,18 +532,24 @@
           { msg: "Opening reader...", step: 6 }
         ];
         let stepIdx = 0;
+        let elapsedMs = 0;
         progressText.textContent = steps[0].msg;
         stepInterval = setInterval(() => {
-          stepIdx = (stepIdx + 1) % steps.length;
-          progressText.textContent = steps[stepIdx].msg;
-          setStepper(steps[stepIdx].step);
+          elapsedMs += 2200;
+          if (elapsedMs >= 4400 && (stepIdx % 2 === 1)) {
+            progressText.textContent = "Connecting to backend service (waking up if idle)...";
+          } else {
+            stepIdx = (stepIdx + 1) % steps.length;
+            progressText.textContent = steps[stepIdx].msg;
+            setStepper(steps[stepIdx].step);
+          }
         }, 2200);
 
         const formData = new FormData();
         formData.append('file', selectedFile);
 
         try {
-          const res = await fetch('/api/upload', {
+          const res = await fetch(getFlipApiUrl('/api/upload'), {
             method: 'POST',
             body: formData
           });
@@ -617,15 +623,21 @@
           { msg: "Opening reader...", step: 6 }
         ];
         let stepIdx = 0;
+        let urlElapsedMs = 0;
         progressText.textContent = steps[0].msg;
         stepInterval = setInterval(() => {
-          stepIdx = (stepIdx + 1) % steps.length;
-          progressText.textContent = steps[stepIdx].msg;
-          setStepper(steps[stepIdx].step);
+          urlElapsedMs += 2200;
+          if (urlElapsedMs >= 4400 && (stepIdx % 2 === 1)) {
+            progressText.textContent = "Connecting to backend service (waking up if idle)...";
+          } else {
+            stepIdx = (stepIdx + 1) % steps.length;
+            progressText.textContent = steps[stepIdx].msg;
+            setStepper(steps[stepIdx].step);
+          }
         }, 2200);
 
         try {
-          const res = await fetch('/api/upload-url', {
+          const res = await fetch(getFlipApiUrl('/api/upload-url'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: rawUrl })

@@ -25,6 +25,7 @@ generated/
 # Temporary / test document formats
 *.pdf
 *.zip
+!java-app/src/main/resources/static/flip-to-read-extension.zip
 *_standalone*.html
 extracted_*/
 test_extracted_*/

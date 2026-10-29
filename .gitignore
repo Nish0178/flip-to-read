@@ -30,6 +30,9 @@ generated/
 extracted_*/
 test_extracted_*/
 temp_*/
+scratch/
+tmp/
+temp/
 
 # Operating system & editor files
 .DS_Store

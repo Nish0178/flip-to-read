@@ -129,7 +129,7 @@ User clicks [ Open as Flipbook ]
 Extension calls POST /api/upload-url { url: "https://example.com/paper.pdf" }
     │
     ▼
-Spring Boot validates SSRF safety & streams PDF (max 50 MB)
+Spring Boot validates SSRF safety & streams PDF (max 1 GB)
     │
     ▼
 PyMuPDF converts pages to textures and stores metadata
@@ -152,7 +152,7 @@ User clicks [ Upload Local PDF ] in extension popup
 File dialog opens -> User selects "MyBook.pdf"
     │
     ▼
-Extension validates: file is .pdf and <= 50 MB
+Extension validates: file is .pdf and <= 1 GB
     │
     ▼
 Extension streams file to POST /api/upload

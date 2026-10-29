@@ -242,5 +242,11 @@ public class BookController {
         boolean deleted = service.deleteBook(id);
         return ResponseEntity.ok(Map.of("deleted", deleted, "id", id));
     }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<?> handleMaxSizeException(org.springframework.web.multipart.MaxUploadSizeExceededException exc) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(Map.of("error", "File is too large. Maximum supported size is 1 GB."));
+    }
 }
 

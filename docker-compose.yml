@@ -13,7 +13,7 @@ services:
       - PYTHON_SCRIPT=python-service/convert.py
       - STORAGE_DIR=/app/storage/books
       - APP_DPI=${APP_DPI:-150}
-      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-50MB}
-      - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE:-50MB}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-1GB}
+      - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE:-1GB}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
     restart: unless-stopped

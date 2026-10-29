@@ -110,7 +110,7 @@
           <div class="drop-title">Drop your PDF here</div>
           <div class="drop-subtitle">or <span style="color: var(--accent); font-weight: 600;">browse from your computer</span></div>
         </div>
-        <div class="drop-limit">Maximum file size: 50 MB &bull; PDF documents only</div>
+        <div class="drop-limit">Up to 1 GB &bull; PDF documents only</div>
         <input type="file" id="file-input" accept="application/pdf,.pdf" style="display: none;" aria-hidden="true">
       </div>
 
@@ -121,7 +121,7 @@
           <input type="url" id="url-input" class="url-text-input" placeholder="https://example.com/document.pdf" aria-label="PDF Document URL">
           <button type="button" class="btn-url-convert" id="btn-url-convert">Convert</button>
         </div>
-        <div class="url-hint">Enter a direct link to any publicly accessible PDF document (max 50 MB)</div>
+        <div class="url-hint">Enter a direct link to any publicly accessible PDF document (Up to 1 GB)</div>
       </div>
 
       <!-- File Preview (Visible after selecting a file) -->
@@ -371,7 +371,7 @@
       const btnCloseModal = document.getElementById('btn-close-modal');
       const btnModalGotIt = document.getElementById('btn-modal-got-it');
 
-      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+      const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1 GB
       let selectedFile = null;
       let stepInterval = null;
 
@@ -497,7 +497,7 @@
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
           setStepper(3);
-          showError("File is too large (" + formatFileSize(file.size) + "). Maximum allowed size is 50 MB.");
+          showError("File is too large (" + formatFileSize(file.size) + "). Maximum supported size is 1 GB.");
           return;
         }
 
@@ -514,7 +514,7 @@
 
       btnCreate.addEventListener('click', startUpload);
 
-      async function startUpload() {
+      function startUpload() {
         if (!selectedFile) return;
 
         clearError();
@@ -522,66 +522,87 @@
         btnChangeFile.disabled = true;
         progressBox.classList.add('active');
         setStepper(4); // Uploading
-
-        // Conversion-focused progress messages
-        const steps = [
-          { msg: "Uploading PDF...", step: 4 },
-          { msg: "Converting the file to flipbook...", step: 5 },
-          { msg: "Preparing your flipbook...", step: 5 },
-          { msg: "Opening your flipbook...", step: 6 }
-        ];
-        let stepIdx = 0;
-        let elapsedMs = 0;
-        progressText.textContent = steps[0].msg;
-        stepInterval = setInterval(() => {
-          elapsedMs += 1800;
-          if (elapsedMs >= 2500) {
-            progressText.textContent = "Converting the file to flipbook...";
-            setStepper(5);
-          } else {
-            stepIdx = (stepIdx + 1) % steps.length;
-            progressText.textContent = steps[stepIdx].msg;
-            setStepper(steps[stepIdx].step);
-          }
-        }, 1800);
+        progressText.textContent = "Uploading PDF...";
 
         const formData = new FormData();
         formData.append('file', selectedFile);
 
-        try {
-          const res = await fetch(getFlipApiUrl('/api/upload'), {
-            method: 'POST',
-            body: formData
-          });
+        const xhr = new XMLHttpRequest();
+        let stepInterval = null;
 
-          const data = await res.json().catch(() => ({}));
-          clearInterval(stepInterval);
-
-          if (!res.ok) {
-            throw new Error(data.error || 'Conversion failed. Please try again.');
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && e.total > 0) {
+            const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
+            if (percent < 100) {
+              progressText.textContent = `Uploading PDF — ${percent}%`;
+            } else {
+              progressText.textContent = "Converting the file to flipbook...";
+              setStepper(5);
+            }
           }
+        };
 
-          setStepper(6); // Open Flipbook
-          progressText.textContent = "Opening your flipbook...";
+        xhr.upload.onload = () => {
+          progressText.textContent = "Converting the file to flipbook...";
+          setStepper(5);
+          let elapsed = 0;
+          stepInterval = setInterval(() => {
+            elapsed += 1500;
+            if (elapsed >= 3500) {
+              progressText.textContent = "Preparing your flipbook...";
+            } else {
+              progressText.textContent = "Converting the file to flipbook...";
+            }
+          }, 1500);
+        };
 
-          // Save to local recent books history
-          saveToRecentBooks({
-            id: data.id,
-            title: data.title || selectedFile.name.replace(/\.[^/.]+$/, ""),
-            pages: data.pages || 1,
-            lastPage: 1,
-            timestamp: Date.now()
-          });
+        xhr.onload = () => {
+          if (stepInterval) clearInterval(stepInterval);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            let data = {};
+            try {
+              data = JSON.parse(xhr.responseText);
+            } catch (err) {}
+            setStepper(6); // Open Flipbook
+            progressText.textContent = "Opening your flipbook...";
 
-          window.location.href = '/flipbook.html?id=' + encodeURIComponent(data.id);
-        } catch (err) {
-          clearInterval(stepInterval);
+            saveToRecentBooks({
+              id: data.id,
+              title: data.title || selectedFile.name.replace(/\.[^/.]+$/, ""),
+              pages: data.pages || 1,
+              lastPage: 1,
+              timestamp: Date.now()
+            });
+
+            window.location.href = '/flipbook.html?id=' + encodeURIComponent(data.id);
+          } else {
+            let errorMsg = 'Conversion failed. Please try again.';
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (data.error) errorMsg = data.error;
+            } catch (err) {}
+            if (xhr.status === 413) {
+              errorMsg = "File is too large. Maximum supported size is 1 GB.";
+            }
+            progressBox.classList.remove('active');
+            btnCreate.disabled = false;
+            btnChangeFile.disabled = false;
+            setStepper(3);
+            showError(errorMsg);
+          }
+        };
+
+        xhr.onerror = () => {
+          if (stepInterval) clearInterval(stepInterval);
           progressBox.classList.remove('active');
           btnCreate.disabled = false;
           btnChangeFile.disabled = false;
           setStepper(3);
-          showError(err.message || "Failed to create flipbook. Please try again.");
-        }
+          showError("Network error during upload. Please check your connection and try again.");
+        };
+
+        xhr.open('POST', getFlipApiUrl('/api/upload'), true);
+        xhr.send(formData);
       }
 
       btnUrlConvert.addEventListener('click', startUrlConversion);

@@ -53,6 +53,11 @@ public class StandaloneFlipbookService {
             throw new IOException("Original source PDF not found for flipbook: " + id);
         }
 
+        long pdfSize = Files.size(sourcePdf);
+        if (pdfSize > 500L * 1024 * 1024) {
+            throw new IOException("Single-file standalone HTML embedding is limited to PDFs up to 500 MB due to browser memory limits. Please download the original PDF or offline ZIP package for very large documents.");
+        }
+
         Map<String, Object> meta = converterService.meta(id);
         String rawTitle = meta != null && meta.get("title") != null
                 ? (String) meta.get("title")
@@ -166,11 +171,22 @@ public class StandaloneFlipbookService {
                 : "Flipbook";
         String folderName = ConverterService.sanitizeForFilename(rawTitle) + "_Flipbook";
 
+        String originalName = meta != null && meta.get("filename") != null ? (String) meta.get("filename") : "source.pdf";
+        String safePdfName = ConverterService.sanitizeForFilename(originalName);
+        if (!safePdfName.toLowerCase().endsWith(".pdf")) safePdfName += ".pdf";
+
+        long pdfSize = Files.size(sourcePdf);
+
         try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(os)) {
-            // 1. index.html (the standalone self-contained HTML flipbook)
+            // 1. index.html (the standalone self-contained HTML flipbook or large document notice)
             java.util.zip.ZipEntry htmlEntry = new java.util.zip.ZipEntry(folderName + "/index.html");
             zos.putNextEntry(htmlEntry);
-            generateStandaloneHtml(id, zos);
+            if (pdfSize <= 500L * 1024 * 1024) {
+                generateStandaloneHtml(id, zos);
+            } else {
+                String largeDocHtml = buildLargeDocNoticeHtml(rawTitle, safePdfName, pdfSize);
+                zos.write(largeDocHtml.getBytes(StandardCharsets.UTF_8));
+            }
             zos.closeEntry();
 
             // 2. README.txt
@@ -189,9 +205,6 @@ public class StandaloneFlipbookService {
             }
 
             // 4. Original source PDF
-            String originalName = meta != null && meta.get("filename") != null ? (String) meta.get("filename") : "source.pdf";
-            String safePdfName = ConverterService.sanitizeForFilename(originalName);
-            if (!safePdfName.toLowerCase().endsWith(".pdf")) safePdfName += ".pdf";
             java.util.zip.ZipEntry pdfEntry = new java.util.zip.ZipEntry(folderName + "/" + safePdfName);
             zos.putNextEntry(pdfEntry);
             Files.copy(sourcePdf, zos);
@@ -199,6 +212,36 @@ public class StandaloneFlipbookService {
 
             zos.finish();
         }
+    }
+
+    private String buildLargeDocNoticeHtml(String title, String safePdfName, long sizeBytes) {
+        String sizeMb = String.format("%.1f MB", sizeBytes / (1024.0 * 1024.0));
+        return "<!DOCTYPE html>\n"
+             + "<html lang=\"en\">\n"
+             + "<head>\n"
+             + "  <meta charset=\"UTF-8\">\n"
+             + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+             + "  <title>" + ConverterService.escapeHtml(title) + " — Flip to Read</title>\n"
+             + "  <style>\n"
+             + "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }\n"
+             + "    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 36px; max-width: 540px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }\n"
+             + "    h1 { margin-top: 0; font-size: 1.5rem; color: #fff; }\n"
+             + "    p { color: #94a3b8; line-height: 1.6; font-size: 0.95rem; margin: 16px 0; }\n"
+             + "    .badge { display: inline-block; background: #0284c7; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; margin-bottom: 16px; }\n"
+             + "    .btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; margin-top: 12px; transition: background 0.2s; }\n"
+             + "    .btn:hover { background: #1d4ed8; }\n"
+             + "  </style>\n"
+             + "</head>\n"
+             + "<body>\n"
+             + "  <div class=\"card\">\n"
+             + "    <div class=\"badge\">Large Document (" + sizeMb + ")</div>\n"
+             + "    <h1>" + ConverterService.escapeHtml(title) + "</h1>\n"
+             + "    <p>This PDF is " + sizeMb + ". Single-file embedded HTML is restricted above 500 MB to prevent web browser tab crashes from exceeding browser memory limitations.</p>\n"
+             + "    <p>The complete, full-fidelity PDF document is safely bundled right beside this file in your downloaded folder.</p>\n"
+             + "    <a class=\"btn\" href=\"./" + ConverterService.escapeHtml(safePdfName) + "\">Open Original PDF</a>\n"
+             + "  </div>\n"
+             + "</body>\n"
+             + "</html>\n";
     }
 
     private String buildReadme(String title, int pageCount) {

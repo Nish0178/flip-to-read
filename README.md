@@ -49,10 +49,10 @@ The production reader uses the original PDF with **PDF.js** and high-DPI canvas 
 ## Core Features
 
 ### 📄 PDF Conversion Engine
-- **Local PDF Upload**: Multipart file ingestion supporting documents up to 50 MB (`/api/upload`).
+- **Local PDF Upload**: Streaming multipart file ingestion supporting documents up to 1 GB (`/api/upload`) with real-time percentage progress tracking.
 - **Remote PDF URL Fetching**: Direct conversion of online PDFs with comprehensive SSRF protection and multi-hop validation (`/api/upload-url`).
 - **Magic-Byte Signature Validation**: Enforces `%PDF` header inspection on all incoming streams prior to disk allocation.
-- **High-Fidelity Metadata & Rasterization**: PyMuPDF extraction engine generating exact aspect ratio metadata, page dimensions, and fallback raster textures.
+- **Fast-First Architecture**: Streams incoming PDFs directly to disk, extracts essential geometry and page metadata instantly via PyMuPDF `--meta-only`, and opens the PDF.js reader immediately while fallback raster textures generate asynchronously in bounded background threads.
 
 ### 📖 Interactive Reader
 - **High-DPI Vector Canvas Rendering**: Renders original PDF vectors on demand using PDF.js scaled to the device pixel ratio (DPR), ensuring tack-sharp text on HiDPI and 4K monitors.
@@ -79,7 +79,7 @@ The production reader uses the original PDF with **PDF.js** and high-DPI canvas 
 
 ### 🛡️ Security & Privacy
 - **SSRF Protection**: Resolves remote hostnames against loopback, private IPv4/IPv6 CIDR blocks, and link-local addresses.
-- **Stream Termination**: Capped download sizes (50 MB) protect against disk exhaustion attacks.
+- **Stream Termination & Disk Quotas**: Capped upload and download sizes (1 GB) and available disk space verification protect against heap exhaustion and disk saturation attacks.
 - **Strict CORS Policy**: Restricted strictly to authorized extension IDs, `localhost`, and `127.0.0.1`, with optional production domain configuration.
 - **Zero Surveillance**: No background browsing tracking, no analytics, and no telemetry.
 
@@ -284,7 +284,8 @@ docker run -d \
   -p 8080:8080 \
   -e PORT=8080 \
   -e APP_DPI=180 \
-  -e MAX_FILE_SIZE=50MB \
+  -e MAX_FILE_SIZE=1GB \
+  -e MAX_REQUEST_SIZE=1GB \
   flip-to-read
 ```
 
@@ -298,8 +299,8 @@ docker run -d \
 | `STORAGE_DIR` | `/app/storage/books` (container) / `storage/books` (local) | Path to temporary writable book storage directory |
 | `APP_DPI` | `180` | Fallback PDF page rendering raster resolution (DPI) |
 | `APP_IMAGE_FORMAT` | `jpg` | Fallback raster page format (`jpg` or `png`) |
-| `MAX_FILE_SIZE` | `50MB` | Maximum allowed individual upload file size |
-| `MAX_REQUEST_SIZE` | `50MB` | Maximum allowed multipart request size |
+| `MAX_FILE_SIZE` | `1GB` | Maximum allowed individual upload file size |
+| `MAX_REQUEST_SIZE` | `1GB` | Maximum allowed multipart request size |
 | `CORS_ALLOWED_ORIGINS` | *(empty)* | Optional comma-separated additional CORS origins (e.g. `https://yourdomain.com`) |
 
 #### Temporary Storage Behavior
@@ -424,7 +425,7 @@ For comprehensive architectural specifications, refer to [docs/extension-archite
    - Blocks loopback addresses (`127.0.0.1`, `::1`), private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), and link-local cloud metadata addresses (`169.254.0.0/16`).
    - Follows up to 3 redirects, re-verifying IP safety on every hop.
 2. **Stream Termination & Size Quotas**:
-   - Upload and stream sizes are hard-capped at 50 MB to prevent disk exhaustion attacks.
+   - Upload and stream sizes are capped at 1 GB with streaming disk writes to prevent heap memory exhaustion and DoS attacks.
    - Incoming byte streams are validated against the `%PDF` file header signature before allocation.
 3. **Cross-Origin Resource Sharing (CORS)**:
    - Configured in `WebConfig.java` to explicitly authorize `chrome-extension://*`, `http://localhost:*`, and `http://127.0.0.1:*`. Arbitrary wildcard origin access is rejected.
@@ -436,7 +437,11 @@ For comprehensive architectural specifications, refer to [docs/extension-archite
 ## Production & Deployment Notes
 
 - **Local Development**: The project is pre-configured out-of-the-box for local execution with Spring Boot running on port `8080`.
-- **Production Backend**: When deploying the backend to cloud environments (e.g. Docker, AWS, Render, DigitalOcean), set environment variables or override `application.properties` (e.g. `PORT`, `PYTHON_CMD`, `STORAGE_DIR`, `MAX_FILE_SIZE`).
+- **Fast-First Architecture**: Uploaded PDFs stream directly to disk without whole-file memory buffering. The PyMuPDF worker reads only metadata and page count in `--meta-only` mode (taking under 200ms), immediately returning the book identifier so the user can begin reading through PDF.js without waiting for multi-page rasterization. Bounded background workers (capped at 3 threads) handle fallback image rendering without blocking.
+- **Application Limit vs. Cloud Deployment Reality**:
+  - **Application Limit**: Flip to Read is technically configured and memory-architected to accept PDF documents up to **1 GB**.
+  - **Render Free Tier Deployment Reality**: The current Render Free deployment uses ephemeral storage (no persistent volume attachment) and operates within a 512 MB RAM ceiling. Processing arbitrary large 1 GB PDF documents on a free ephemeral instance may encounter resource constraints, temporary disk limits, or cold-start container restarts.
+  - **Recommended Production Deployment**: For mission-critical environments handling frequent multi-hundred-megabyte or 1 GB PDFs, deploy the backend on cloud services with persistent SSD storage (e.g., AWS ECS with EBS volumes, Render with attached persistent disks, or Google Cloud Run with S3/GCS object storage) and 2 GB+ RAM.
 - **Browser Extension Production Distribution**: Before packaging and submitting the browser extension to the Chrome Web Store or Microsoft Edge Add-ons catalog, update the default backend server URL in `extension/src/shared/storage.ts` and the `host_permissions` in `extension/manifest.json` to point to your live production domain.
 
 ---

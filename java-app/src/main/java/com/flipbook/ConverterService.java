@@ -63,6 +63,7 @@ public class ConverterService {
 
     // Active conversions tracking to protect from premature TTL cleanup and race conditions
     private final ConcurrentHashMap<String, CompletableFuture<Void>> activeConversions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Process> activeProcesses = new ConcurrentHashMap<>();
 
     @Value("${app.python}")
     private String python;
@@ -78,6 +79,9 @@ public class ConverterService {
 
     @Value("${app.storage-dir}")
     private String storageDir;
+
+    @Value("${app.max-file-size-bytes:1073741824}")
+    private long maxPdfBytes = 1024L * 1024 * 1024L; // 1 GB default (1073741824 bytes)
 
     private Path root() throws IOException {
         Path p = Paths.get(storageDir);
@@ -108,12 +112,25 @@ public class ConverterService {
         if (future != null) {
             future.cancel(true);
         }
+        Process proc = activeProcesses.remove(id);
+        if (proc != null && proc.isAlive()) {
+            proc.destroyForcibly();
+            try {
+                proc.waitFor(2, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {}
+        }
         try {
             Path bookDir = getBookDir(id);
             if (bookDir == null || !Files.exists(bookDir)) {
                 return false;
             }
-            deleteDirectoryRecursively(bookDir);
+            for (int attempt = 0; attempt < 5; attempt++) {
+                deleteDirectoryRecursively(bookDir);
+                if (!Files.exists(bookDir)) {
+                    return true;
+                }
+                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+            }
             return !Files.exists(bookDir);
         } catch (Exception e) {
             return false;
@@ -265,13 +282,17 @@ public class ConverterService {
      * triggers bounded background PyMuPDF rasterization, and immediately returns the book ID.
      */
     public String convert(MultipartFile file) throws IOException, InterruptedException {
+        if (activeConversions.size() >= 15) {
+            throw new IOException("Server is currently experiencing high conversion traffic. Please try again in a few moments.");
+        }
         validate(file);
+        checkAvailableDiskSpace(file.getSize());
 
         String id = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         Path bookDir = root().resolve(id);
         Files.createDirectories(bookDir);
 
-        // 1. Preserve original source.pdf synchronously before returning ID
+        // 1. Preserve original source.pdf synchronously before returning ID (streamed via transferTo)
         Path pdf = bookDir.resolve("source.pdf");
         file.transferTo(pdf);
 
@@ -325,9 +346,10 @@ public class ConverterService {
                         String.valueOf(dpi), imageFormat);
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
+                activeProcesses.put(id, process);
 
                 String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                boolean finished = process.waitFor(300, TimeUnit.SECONDS);
+                boolean finished = process.waitFor(1200, TimeUnit.SECONDS); // 20 min max for very large PDFs
                 if (!finished) {
                     process.destroyForcibly();
                     System.err.println("[ConverterService] Background conversion timed out for " + id);
@@ -341,6 +363,7 @@ public class ConverterService {
             } catch (Exception e) {
                 System.err.println("[ConverterService] Background rasterization error for " + id + ": " + e.getMessage());
             } finally {
+                activeProcesses.remove(id);
                 activeConversions.remove(id);
             }
         }, rasterExecutor);
@@ -869,6 +892,22 @@ public class ConverterService {
                    .replace("'", "&#39;");
     }
 
+    private void checkAvailableDiskSpace(long requiredBytes) throws IOException {
+        Path r = root();
+        try {
+            java.nio.file.FileStore store = Files.getFileStore(r);
+            long usable = store.getUsableSpace();
+            // Ensure at least requiredBytes + 200MB free safety headroom
+            if (usable < requiredBytes + (200L * 1024 * 1024)) {
+                throw new IOException("Server storage is temporarily full. Please try again later.");
+            }
+        } catch (IOException e) {
+            if (e.getMessage() != null && e.getMessage().contains("storage is temporarily full")) {
+                throw e;
+            }
+        }
+    }
+
     private void validate(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IOException("No file uploaded.");
@@ -877,16 +916,23 @@ public class ConverterService {
         if (!name.endsWith(".pdf")) {
             throw new IOException("Only PDF files are allowed.");
         }
-        byte[] head = file.getInputStream().readNBytes(5);
-        if (!new String(head, StandardCharsets.US_ASCII).startsWith("%PDF")) {
-            throw new IOException("This file is not a valid PDF.");
+        if (file.getSize() > maxPdfBytes) {
+            throw new IOException("File is too large. Maximum supported size is 1 GB.");
+        }
+        try (InputStream is = file.getInputStream()) {
+            byte[] head = is.readNBytes(5);
+            if (!new String(head, StandardCharsets.US_ASCII).startsWith("%PDF")) {
+                throw new IOException("This file is not a valid PDF (missing %PDF signature).");
+            }
         }
     }
 
-    private static final long MAX_PDF_BYTES = 50L * 1024 * 1024; // 50 MB
     private static final Pattern FILENAME_FROM_DISP = Pattern.compile("filename\\*?=(?:UTF-8'')?[\"']?([^\"';\\n]+)[\"']?", Pattern.CASE_INSENSITIVE);
 
     public String convertFromUrl(String urlStr) throws IOException, InterruptedException {
+        if (activeConversions.size() >= 15) {
+            throw new IOException("Server is currently experiencing high conversion traffic. Please try again in a few moments.");
+        }
         if (urlStr == null || urlStr.isBlank()) {
             throw new IOException("URL cannot be empty.");
         }
@@ -977,18 +1023,18 @@ public class ConverterService {
             }
 
             long contentLength = conn.getContentLengthLong();
-            if (contentLength > MAX_PDF_BYTES) {
-                throw new IOException("The PDF file exceeds the maximum size limit of 50 MB.");
+            if (contentLength > maxPdfBytes) {
+                throw new IOException("The PDF file exceeds the maximum size limit of 1 GB.");
             }
 
             try (InputStream in = conn.getInputStream();
                  OutputStream out = Files.newOutputStream(pdf)) {
-                byte[] buf = new byte[8192];
+                byte[] buf = new byte[65536];
                 int n;
                 while ((n = in.read(buf)) != -1) {
                     totalBytes += n;
-                    if (totalBytes > MAX_PDF_BYTES) {
-                        throw new IOException("The PDF file exceeds the maximum size limit of 50 MB.");
+                    if (totalBytes > maxPdfBytes) {
+                        throw new IOException("The PDF file exceeds the maximum size limit of 1 GB.");
                     }
                     out.write(buf, 0, n);
                 }

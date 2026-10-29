@@ -163,8 +163,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       showError('Please select a valid PDF file (.pdf).');
       return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-      showError('PDF file is too large (max 50 MB).');
+    if (file.size > 1024 * 1024 * 1024) {
+      showError('PDF file is too large (max 1 GB).');
       return;
     }
 

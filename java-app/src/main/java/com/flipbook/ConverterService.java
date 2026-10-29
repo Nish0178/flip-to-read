@@ -20,7 +20,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -43,6 +49,20 @@ public class ConverterService {
 
     private static final Pattern SAFE_ID = Pattern.compile("^[a-f0-9]{12}$");
     private final ObjectMapper mapper = new ObjectMapper();
+
+    // Bounded executor for background rasterization (max 2 parallel tasks, daemon threads)
+    private final ExecutorService rasterExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
+        private final AtomicInteger counter = new AtomicInteger(1);
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "flipbook-rasterizer-" + counter.getAndIncrement());
+            t.setDaemon(true);
+            return t;
+        }
+    });
+
+    // Active conversions tracking to protect from premature TTL cleanup and race conditions
+    private final ConcurrentHashMap<String, CompletableFuture<Void>> activeConversions = new ConcurrentHashMap<>();
 
     @Value("${app.python}")
     private String python;
@@ -84,6 +104,10 @@ public class ConverterService {
         if (id == null || !SAFE_ID.matcher(id).matches()) {
             return false;
         }
+        CompletableFuture<Void> future = activeConversions.remove(id);
+        if (future != null) {
+            future.cancel(true);
+        }
         try {
             Path bookDir = getBookDir(id);
             if (bookDir == null || !Files.exists(bookDir)) {
@@ -116,6 +140,14 @@ public class ConverterService {
 
     @PreDestroy
     public void onShutdown() {
+        rasterExecutor.shutdown();
+        try {
+            if (!rasterExecutor.awaitTermination(3, TimeUnit.SECONDS)) {
+                rasterExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            rasterExecutor.shutdownNow();
+        }
         cleanupAllBooks();
     }
 
@@ -135,6 +167,7 @@ public class ConverterService {
 
     /**
      * Automatically clean up any books older than 15 minutes to guarantee no data lingers.
+     * Skips books currently undergoing background conversion.
      */
     @Scheduled(fixedRate = 60000)
     public void cleanupExpiredBooks() {
@@ -147,6 +180,11 @@ public class ConverterService {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
                 for (Path bookDir : stream) {
                     if (Files.isDirectory(bookDir)) {
+                        String id = bookDir.getFileName().toString();
+                        // NEVER delete a book currently being converted
+                        if (isConversionActive(id)) {
+                            continue;
+                        }
                         long lastModified = Files.getLastModifiedTime(bookDir).toMillis();
                         if (now - lastModified > maxAge) {
                             deleteDirectoryRecursively(bookDir);
@@ -155,6 +193,24 @@ public class ConverterService {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    public boolean isConversionActive(String id) {
+        if (id == null) return false;
+        CompletableFuture<Void> future = activeConversions.get(id);
+        return future != null && !future.isDone();
+    }
+
+    public boolean awaitConversion(String id, long timeout, TimeUnit unit) {
+        if (id == null) return true;
+        CompletableFuture<Void> future = activeConversions.get(id);
+        if (future == null || future.isDone()) return true;
+        try {
+            future.get(timeout, unit);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
 
@@ -204,7 +260,9 @@ public class ConverterService {
     }
 
     /**
-     * Saves the PDF, runs the Python converter, stores enriched metadata, and preserves source.pdf.
+     * Fast-first conversion:
+     * Saves source.pdf, extracts page count & dimensions in ~100ms, enriches metadata,
+     * triggers bounded background PyMuPDF rasterization, and immediately returns the book ID.
      */
     public String convert(MultipartFile file) throws IOException, InterruptedException {
         validate(file);
@@ -213,40 +271,81 @@ public class ConverterService {
         Path bookDir = root().resolve(id);
         Files.createDirectories(bookDir);
 
-        // Preserve original source.pdf
+        // 1. Preserve original source.pdf synchronously before returning ID
         Path pdf = bookDir.resolve("source.pdf");
         file.transferTo(pdf);
 
+        // 2. Extract metadata quickly using PyMuPDF (--meta-only)
+        try {
+            extractQuickMetadata(pdf, bookDir);
+        } catch (Exception e) {
+            deleteDirectoryRecursively(bookDir);
+            throw new IOException("Failed to process PDF: " + e.getMessage(), e);
+        }
+
+        // 3. Enrich meta.json with full document metadata (id, filename, title, size, createdAt)
+        enrichMetadata(bookDir, id, file);
+
+        // 4. Start PyMuPDF page rasterization in the background
+        triggerBackgroundRasterization(id, pdf, bookDir);
+
+        // 5. Return book ID immediately so flipbook opens in client PDF.js reader
+        return id;
+    }
+
+    private void extractQuickMetadata(Path pdf, Path bookDir) throws IOException, InterruptedException {
         Path scriptPath = resolveScriptPath();
         String pythonCmd = resolvePythonCommand();
 
         ProcessBuilder pb = new ProcessBuilder(
-                pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(), String.valueOf(dpi), imageFormat);
+                pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(),
+                String.valueOf(dpi), imageFormat, "--meta-only");
         pb.redirectErrorStream(true);
         Process process = pb.start();
 
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (!process.waitFor(180, TimeUnit.SECONDS)) {
+        if (!process.waitFor(20, TimeUnit.SECONDS)) {
             process.destroyForcibly();
-            throw new IOException("Conversion timed out.");
+            throw new IOException("Metadata extraction timed out.");
         }
 
         if (process.exitValue() != 0) {
-            // Clean up directory on failure
-            try {
-                Files.walk(bookDir)
-                        .sorted((a, b) -> b.compareTo(a))
-                        .forEach(p -> {
-                            try { Files.deleteIfExists(p); } catch (Exception ignored) {}
-                        });
-            } catch (Exception ignored) {}
-            throw new IOException("Conversion failed: " + (output.isBlank() ? "Exit code " + process.exitValue() : output.trim()));
+            throw new IOException("Metadata extraction failed: " + (output.isBlank() ? "Exit code " + process.exitValue() : output.trim()));
         }
+    }
 
-        // Enrich meta.json with full document metadata
-        enrichMetadata(bookDir, id, file);
+    private void triggerBackgroundRasterization(String id, Path pdf, Path bookDir) {
+        Path scriptPath = resolveScriptPath();
+        String pythonCmd = resolvePythonCommand();
 
-        return id;
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try {
+                ProcessBuilder pb = new ProcessBuilder(
+                        pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(),
+                        String.valueOf(dpi), imageFormat);
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+
+                String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                boolean finished = process.waitFor(300, TimeUnit.SECONDS);
+                if (!finished) {
+                    process.destroyForcibly();
+                    System.err.println("[ConverterService] Background conversion timed out for " + id);
+                    return;
+                }
+                if (process.exitValue() != 0) {
+                    System.err.println("[ConverterService] Background conversion exit code "
+                            + process.exitValue() + " for " + id + ": " + output.trim());
+                    // NOTE: Do not delete bookDir or source.pdf; the book is still readable via PDF.js.
+                }
+            } catch (Exception e) {
+                System.err.println("[ConverterService] Background rasterization error for " + id + ": " + e.getMessage());
+            } finally {
+                activeConversions.remove(id);
+            }
+        }, rasterExecutor);
+
+        activeConversions.put(id, future);
     }
 
     private void enrichMetadata(Path bookDir, String id, MultipartFile file) {
@@ -341,6 +440,9 @@ public class ConverterService {
             throw new IOException("Book not found.");
         }
 
+        // Wait for background rasterization if active, up to 60 seconds
+        awaitConversion(id, 60, TimeUnit.SECONDS);
+
         Map<String, Object> meta = meta(id);
         if (meta == null) {
             throw new IOException("Book metadata not found.");
@@ -351,7 +453,7 @@ public class ConverterService {
 
         // Collect all page-N.jpg files in order
         List<Path> pages = new ArrayList<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(bookDir, "page-*.jpg")) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(bookDir, "page-*." + meta.getOrDefault("format", "jpg"))) {
             for (Path entry : stream) {
                 pages.add(entry);
             }
@@ -904,26 +1006,21 @@ public class ConverterService {
                 }
             }
 
-            Path scriptPath = resolveScriptPath();
-            String pythonCmd = resolvePythonCommand();
-
-            ProcessBuilder pb = new ProcessBuilder(
-                    pythonCmd, scriptPath.toString(), pdf.toString(), bookDir.toString(), String.valueOf(dpi), imageFormat);
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            if (!process.waitFor(180, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IOException("Conversion timed out.");
-            }
-
-            if (process.exitValue() != 0) {
+            // 2. Extract metadata quickly using PyMuPDF (--meta-only)
+            try {
+                extractQuickMetadata(pdf, bookDir);
+            } catch (Exception e) {
                 deleteDirectoryRecursively(bookDir);
-                throw new IOException("Conversion failed: " + (output.isBlank() ? "Exit code " + process.exitValue() : output.trim()));
+                throw new IOException("Failed to process remote PDF: " + e.getMessage(), e);
             }
 
+            // 3. Enrich metadata for URL
             enrichMetadataForUrl(bookDir, id, detectedFilename, totalBytes, urlStr);
+
+            // 4. Start background rasterization
+            triggerBackgroundRasterization(id, pdf, bookDir);
+
+            // 5. Return book ID immediately
             return id;
         } catch (Exception e) {
             deleteDirectoryRecursively(bookDir);

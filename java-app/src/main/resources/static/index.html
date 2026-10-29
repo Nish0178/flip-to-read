@@ -523,27 +523,27 @@
         progressBox.classList.add('active');
         setStepper(4); // Uploading
 
-        // Stepped progress messages
+        // Conversion-focused progress messages
         const steps = [
-          { msg: "Uploading PDF to Flip to Read...", step: 4 },
-          { msg: "Rasterizing pages with PyMuPDF...", step: 5 },
-          { msg: "Generating page textures & dimensions...", step: 5 },
-          { msg: "Preparing realistic flipbook...", step: 5 },
-          { msg: "Opening reader...", step: 6 }
+          { msg: "Uploading PDF...", step: 4 },
+          { msg: "Converting the file to flipbook...", step: 5 },
+          { msg: "Preparing your flipbook...", step: 5 },
+          { msg: "Opening your flipbook...", step: 6 }
         ];
         let stepIdx = 0;
         let elapsedMs = 0;
         progressText.textContent = steps[0].msg;
         stepInterval = setInterval(() => {
-          elapsedMs += 2200;
-          if (elapsedMs >= 4400 && (stepIdx % 2 === 1)) {
-            progressText.textContent = "Connecting to backend service (waking up if idle)...";
+          elapsedMs += 1800;
+          if (elapsedMs >= 2500) {
+            progressText.textContent = "Converting the file to flipbook...";
+            setStepper(5);
           } else {
             stepIdx = (stepIdx + 1) % steps.length;
             progressText.textContent = steps[stepIdx].msg;
             setStepper(steps[stepIdx].step);
           }
-        }, 2200);
+        }, 1800);
 
         const formData = new FormData();
         formData.append('file', selectedFile);
@@ -562,7 +562,7 @@
           }
 
           setStepper(6); // Open Flipbook
-          progressText.textContent = "Redirecting to your flipbook...";
+          progressText.textContent = "Opening your flipbook...";
 
           // Save to local recent books history
           saveToRecentBooks({
@@ -614,27 +614,25 @@
         setStepper(4); // Downloading from remote URL
 
         const steps = [
-          { msg: "Connecting to remote PDF server...", step: 4 },
-          { msg: "Validating SSRF security & headers...", step: 4 },
-          { msg: "Downloading PDF document...", step: 4 },
-          { msg: "Rasterizing pages with PyMuPDF...", step: 5 },
-          { msg: "Generating page textures & dimensions...", step: 5 },
-          { msg: "Preparing realistic flipbook...", step: 5 },
-          { msg: "Opening reader...", step: 6 }
+          { msg: "Downloading PDF...", step: 4 },
+          { msg: "Converting the file to flipbook...", step: 5 },
+          { msg: "Preparing your flipbook...", step: 5 },
+          { msg: "Opening your flipbook...", step: 6 }
         ];
         let stepIdx = 0;
         let urlElapsedMs = 0;
         progressText.textContent = steps[0].msg;
         stepInterval = setInterval(() => {
-          urlElapsedMs += 2200;
-          if (urlElapsedMs >= 4400 && (stepIdx % 2 === 1)) {
-            progressText.textContent = "Connecting to backend service (waking up if idle)...";
+          urlElapsedMs += 1800;
+          if (urlElapsedMs >= 2500) {
+            progressText.textContent = "Converting the file to flipbook...";
+            setStepper(5);
           } else {
             stepIdx = (stepIdx + 1) % steps.length;
             progressText.textContent = steps[stepIdx].msg;
             setStepper(steps[stepIdx].step);
           }
-        }, 2200);
+        }, 1800);
 
         try {
           const res = await fetch(getFlipApiUrl('/api/upload-url'), {
@@ -651,7 +649,7 @@
           }
 
           setStepper(6); // Open Flipbook
-          progressText.textContent = "Redirecting to your flipbook...";
+          progressText.textContent = "Opening your flipbook...";
 
           saveToRecentBooks({
             id: data.id,

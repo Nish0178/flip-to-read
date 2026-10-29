@@ -411,22 +411,31 @@
             return;
           }
 
-          const img = new Image();
-          img.onload = () => {
-            pageObj.image = img;
-            pageObj.isLoad = true;
-            if (flip.getRender()) flip.getRender().drawFrame();
-          };
-          img.onerror = () => {
-            console.error('Image load failed for page index', pageIndex);
-            pageObj.isLoad = true;
-          };
-          img.src = source;
-          if (img.complete && img.naturalWidth > 0) {
-            pageObj.image = img;
-            pageObj.isLoad = true;
-            if (flip.getRender()) flip.getRender().drawFrame();
+          let loadRetries = 0;
+          function tryLoadImage() {
+            const img = new Image();
+            img.onload = () => {
+              pageObj.image = img;
+              pageObj.isLoad = true;
+              if (flip.getRender()) flip.getRender().drawFrame();
+            };
+            img.onerror = () => {
+              if (loadRetries < 6) {
+                loadRetries++;
+                setTimeout(tryLoadImage, 1000);
+              } else {
+                console.error('Image load failed for page index', pageIndex);
+                pageObj.isLoad = true;
+              }
+            };
+            img.src = source;
+            if (img.complete && img.naturalWidth > 0) {
+              pageObj.image = img;
+              pageObj.isLoad = true;
+              if (flip.getRender()) flip.getRender().drawFrame();
+            }
           }
+          tryLoadImage();
         }
       }
 
@@ -519,10 +528,10 @@
 
       // Initialize reader
       async function init() {
-        const loadingText = document.getElementById('loading-text');
+        const loadingText = document.getElementById('loading-msg') || document.getElementById('loading-text');
         const wakeupTimer = setTimeout(() => {
-          if (loadingText) loadingText.textContent = "Connecting to backend (waking up if idle)...";
-        }, 4000);
+          if (loadingText) loadingText.textContent = "Preparing your flipbook...";
+        }, 3000);
 
         try {
           const res = await fetch(getFlipApiUrl('/api/books/' + encodeURIComponent(id)));
@@ -697,6 +706,19 @@
           flip.loadFromImages(initialPages);
         } else {
           const fmt = bookMeta.format || 'jpg';
+          const loadingMsg = document.getElementById('loading-msg') || document.getElementById('loading-text');
+          if (loadingMsg) loadingMsg.textContent = "Preparing your flipbook...";
+
+          // Ensure raster pages are available before loading fallback
+          const testPageUrl = getFlipApiUrl(`/books/${id}/page-1.${fmt}`);
+          for (let attempt = 0; attempt < 25; attempt++) {
+            try {
+              const chk = await fetch(testPageUrl, { method: 'HEAD', cache: 'no-cache' });
+              if (chk.ok) break;
+            } catch (e) {}
+            await new Promise(r => setTimeout(r, 1000));
+          }
+
           const pages = Array.from({ length: bookMeta.pages }, (_, i) => getFlipApiUrl(`/books/${id}/page-${i + 1}.${fmt}`));
           flip.loadFromImages(pages);
         }

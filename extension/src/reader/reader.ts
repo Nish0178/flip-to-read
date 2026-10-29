@@ -1,5 +1,5 @@
 import { getBookMetadata, getServerUrl } from '../shared/api.js';
-import { getRecentBooks, updateReadingPosition } from '../shared/storage.js';
+import { getRecentBooks, updateReadingPosition, DEFAULT_SERVER_URL, getWebsiteUrl } from '../shared/storage.js';
 import { BookMetadata } from '../shared/types.js';
 
 declare const St: any;
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let flip: any = null;
   let bookMeta: BookMetadata | null = null;
-  let serverUrl = 'http://localhost:8080';
+  let serverUrl = DEFAULT_SERVER_URL;
   let isInitialized = false;
 
   if (!bookId) {
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Open in Flip to Read Website button
   btnOpenInWebsite.addEventListener('click', () => {
     const currentPage = flip ? (flip.getCurrentPageIndex() || 0) + 1 : 1;
-    const webUrl = `${serverUrl}/flipbook.html?id=${encodeURIComponent(bookId)}&page=${currentPage}`;
+    const webUrl = `${getWebsiteUrl(serverUrl)}/flipbook.html?id=${encodeURIComponent(bookId)}&page=${currentPage}`;
     chrome.tabs.create({ url: webUrl });
   });
 

@@ -1,4 +1,4 @@
-import { getSettings, saveSettings, clearRecentBooks } from '../shared/storage.js';
+import { getSettings, saveSettings, clearRecentBooks, DEFAULT_SERVER_URL, getWebsiteUrl } from '../shared/storage.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   const serverUrlInput = document.getElementById('server-url') as HTMLInputElement;
@@ -12,9 +12,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load existing settings
   const settings = await getSettings();
-  serverUrlInput.value = settings.serverUrl || 'http://localhost:8080';
+  serverUrlInput.value = settings.serverUrl || DEFAULT_SERVER_URL;
   if (btnOpenPlatform) {
-    btnOpenPlatform.href = settings.serverUrl || 'http://localhost:8080';
+    btnOpenPlatform.href = getWebsiteUrl(settings.serverUrl);
   }
   toggleRememberPos.checked = settings.rememberPosition ?? true;
   toggleOpenInWebsite.checked = settings.openInWebsite ?? false;
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Save Settings
   btnSaveSettings.addEventListener('click', async () => {
     let url = serverUrlInput.value.trim();
-    if (!url) url = 'http://localhost:8080';
+    if (!url) url = DEFAULT_SERVER_URL;
 
     await saveSettings({
       serverUrl: url,
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     if (btnOpenPlatform) {
-      btnOpenPlatform.href = url;
+      btnOpenPlatform.href = getWebsiteUrl(url);
     }
 
     saveMsg.style.display = 'inline';

@@ -1,7 +1,22 @@
 import { ExtensionSettings, RecentBook } from './types.js';
 
+export const DEFAULT_SERVER_URL = 'https://flip-to-read.onrender.com';
+export const DEFAULT_WEBSITE_URL = 'https://flip-to-read-web.onrender.com';
+
+/**
+ * Returns the public web platform URL corresponding to the current serverUrl.
+ * If serverUrl points to a local environment (localhost / 127.0.0.1), opens local monolithic web app.
+ * Otherwise, returns the production static frontend URL.
+ */
+export function getWebsiteUrl(serverUrl?: string): string {
+  if (serverUrl && (serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1'))) {
+    return serverUrl.replace(/\/+$/, '');
+  }
+  return DEFAULT_WEBSITE_URL;
+}
+
 const DEFAULT_SETTINGS: ExtensionSettings = {
-  serverUrl: 'http://localhost:8080',
+  serverUrl: DEFAULT_SERVER_URL,
   openAutomatically: false,
   rememberPosition: true,
   openInWebsite: false

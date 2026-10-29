@@ -1,5 +1,5 @@
 import { convertOnlinePdf, uploadLocalPdf, getServerUrl } from '../shared/api.js';
-import { getRecentBooks, saveRecentBook, clearRecentBooks, getSettings } from '../shared/storage.js';
+import { getRecentBooks, saveRecentBook, clearRecentBooks, getSettings, getWebsiteUrl } from '../shared/storage.js';
 import { PdfDetectionResult, RecentBook } from '../shared/types.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -37,7 +37,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Open main website
   btnOpenWebsite.addEventListener('click', async () => {
-    const url = await getServerUrl();
+    const settings = await getSettings();
+    const url = getWebsiteUrl(settings.serverUrl);
     chrome.tabs.create({ url: url });
   });
 
@@ -230,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = await getSettings();
     let url = chrome.runtime.getURL(`reader/reader.html?id=${encodeURIComponent(bookId)}&page=${page}`);
     if (settings.openInWebsite) {
-      const base = settings.serverUrl.replace(/\/+$/, '');
+      const base = getWebsiteUrl(settings.serverUrl);
       url = `${base}/flipbook.html?id=${encodeURIComponent(bookId)}&page=${page}`;
     }
     chrome.tabs.create({ url: url });

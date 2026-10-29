@@ -42,6 +42,8 @@
     "contextMenus"
   ],
   "host_permissions": [
+    "https://flip-to-read.onrender.com/*",
+    "https://flip-to-read-web.onrender.com/*",
     "http://localhost:8080/*",
     "http://127.0.0.1:8080/*"
   ]

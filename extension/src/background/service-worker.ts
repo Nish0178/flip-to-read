@@ -1,5 +1,5 @@
 import { convertOnlinePdf } from '../shared/api.js';
-import { getSettings, saveRecentBook } from '../shared/storage.js';
+import { getSettings, saveRecentBook, getWebsiteUrl } from '../shared/storage.js';
 
 // Setup context menu on installation
 chrome.runtime.onInstalled.addListener(() => {
@@ -42,7 +42,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       const settings = await getSettings();
       let readerUrl = chrome.runtime.getURL(`reader/reader.html?id=${encodeURIComponent(book.id)}`);
       if (settings.openInWebsite) {
-        const base = settings.serverUrl.replace(/\/+$/, '');
+        const base = getWebsiteUrl(settings.serverUrl);
         readerUrl = `${base}/flipbook.html?id=${encodeURIComponent(book.id)}`;
       }
 
@@ -65,7 +65,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const settings = await getSettings();
       let targetUrl = chrome.runtime.getURL(`reader/reader.html?id=${encodeURIComponent(message.id)}`);
       if (settings.openInWebsite) {
-        const base = settings.serverUrl.replace(/\/+$/, '');
+        const base = getWebsiteUrl(settings.serverUrl);
         targetUrl = `${base}/flipbook.html?id=${encodeURIComponent(message.id)}`;
       }
       chrome.tabs.create({ url: targetUrl });

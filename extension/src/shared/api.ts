@@ -1,9 +1,9 @@
 import { BookMetadata } from './types.js';
-import { getSettings } from './storage.js';
+import { getSettings, DEFAULT_SERVER_URL } from './storage.js';
 
 export async function getServerUrl(): Promise<string> {
   const settings = await getSettings();
-  return settings.serverUrl.replace(/\/+$/, '');
+  return (settings.serverUrl || DEFAULT_SERVER_URL).replace(/\/+$/, '');
 }
 
 export async function uploadLocalPdf(file: File): Promise<BookMetadata> {

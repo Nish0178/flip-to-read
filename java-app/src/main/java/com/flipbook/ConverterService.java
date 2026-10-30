@@ -1,5 +1,6 @@
 package com.flipbook;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -324,12 +325,13 @@ public class ConverterService {
         pb.redirectErrorStream(true);
         Process process = pb.start();
 
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (!process.waitFor(20, TimeUnit.SECONDS)) {
+        boolean finished = process.waitFor(20, TimeUnit.SECONDS);
+        if (!finished) {
             process.destroyForcibly();
             throw new IOException("Metadata extraction timed out.");
         }
 
+        String output = readProcessOutput(process);
         if (process.exitValue() != 0) {
             throw new IOException("Metadata extraction failed: " + (output.isBlank() ? "Exit code " + process.exitValue() : output.trim()));
         }
@@ -348,13 +350,13 @@ public class ConverterService {
                 Process process = pb.start();
                 activeProcesses.put(id, process);
 
-                String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 boolean finished = process.waitFor(1200, TimeUnit.SECONDS); // 20 min max for very large PDFs
                 if (!finished) {
                     process.destroyForcibly();
                     System.err.println("[ConverterService] Background conversion timed out for " + id);
                     return;
                 }
+                String output = readProcessOutput(process);
                 if (process.exitValue() != 0) {
                     System.err.println("[ConverterService] Background conversion exit code "
                             + process.exitValue() + " for " + id + ": " + output.trim());
@@ -369,6 +371,18 @@ public class ConverterService {
         }, rasterExecutor);
 
         activeConversions.put(id, future);
+    }
+
+    private String readProcessOutput(Process process) throws IOException {
+        try (InputStream is = process.getInputStream()) {
+            byte[] buffer = new byte[8192];
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            int read;
+            while ((read = is.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            return output.toString(StandardCharsets.UTF_8);
+        }
     }
 
     private void enrichMetadata(Path bookDir, String id, MultipartFile file) {
@@ -902,9 +916,7 @@ public class ConverterService {
                 throw new IOException("Server storage is temporarily full. Please try again later.");
             }
         } catch (IOException e) {
-            if (e.getMessage() != null && e.getMessage().contains("storage is temporarily full")) {
-                throw e;
-            }
+            throw new IOException("Unable to verify available storage for PDF conversion.", e);
         }
     }
 
@@ -1121,35 +1133,56 @@ public class ConverterService {
         }
 
         for (InetAddress addr : addresses) {
-            if (addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()) {
+            if (isForbiddenAddress(addr)) {
                 throw new IOException("Access to internal, local, or private network addresses is forbidden.");
-            }
-            byte[] bytes = addr.getAddress();
-            if (bytes.length == 4) {
-                int b0 = bytes[0] & 0xFF;
-                int b1 = bytes[1] & 0xFF;
-                if (b0 == 127 || (b0 == 169 && b1 == 254) || (b0 == 10) || (b0 == 172 && (b1 >= 16 && b1 <= 31)) || (b0 == 192 && b1 == 168) || b0 == 0) {
-                    throw new IOException("Access to internal or private IP ranges is forbidden.");
-                }
-            } else if (bytes.length == 16) {
-                int b0 = bytes[0] & 0xFF;
-                // IPv6 Unique Local Address (ULA) fc00::/7 (0xfc or 0xfd)
-                if ((b0 & 0xFE) == 0xFC) {
-                    throw new IOException("Access to internal, local, or private network addresses is forbidden.");
-                }
-                // Check IPv4-mapped IPv6 address (::ffff:x.x.x.x)
-                boolean isIPv4Mapped = true;
-                for (int i = 0; i < 10; i++) {
-                    if (bytes[i] != 0) { isIPv4Mapped = false; break; }
-                }
-                if (isIPv4Mapped && (bytes[10] & 0xFF) == 0xFF && (bytes[11] & 0xFF) == 0xFF) {
-                    int ip0 = bytes[12] & 0xFF;
-                    int ip1 = bytes[13] & 0xFF;
-                    if (ip0 == 127 || (ip0 == 169 && ip1 == 254) || (ip0 == 10) || (ip0 == 172 && (ip1 >= 16 && ip1 <= 31)) || (ip0 == 192 && ip1 == 168) || ip0 == 0) {
-                        throw new IOException("Access to internal or private IP ranges is forbidden.");
-                    }
-                }
             }
         }
     }
+
+    private boolean isForbiddenAddress(InetAddress addr) {
+        if (addr == null) {
+            return true;
+        }
+        if (addr.isAnyLocalAddress() || addr.isLoopbackAddress() || addr.isLinkLocalAddress()
+                || addr.isSiteLocalAddress() || addr.isMulticastAddress()) {
+            return true;
+        }
+
+        byte[] bytes = addr.getAddress();
+        if (bytes == null || bytes.length == 0) {
+            return true;
+        }
+
+        if (bytes.length == 4) {
+            int b0 = bytes[0] & 0xFF;
+            int b1 = bytes[1] & 0xFF;
+            return b0 == 0 || b0 == 10 || b0 == 127 || (b0 == 169 && b1 == 254)
+                    || (b0 == 172 && b1 >= 16 && b1 <= 31) || (b0 == 192 && b1 == 168)
+                    || (b0 == 100 && (b1 >= 64 && b1 <= 127));
+        }
+
+        if (bytes.length == 16) {
+            int b0 = bytes[0] & 0xFF;
+            if ((b0 & 0xFE) == 0xFC) {
+                return true;
+            }
+            boolean isIPv4Mapped = true;
+            for (int i = 0; i < 10; i++) {
+                if (bytes[i] != 0) {
+                    isIPv4Mapped = false;
+                    break;
+                }
+            }
+            if (isIPv4Mapped && (bytes[10] & 0xFF) == 0xFF && (bytes[11] & 0xFF) == 0xFF) {
+                int ip0 = bytes[12] & 0xFF;
+                int ip1 = bytes[13] & 0xFF;
+                return ip0 == 0 || ip0 == 10 || ip0 == 127 || (ip0 == 169 && ip1 == 254)
+                        || (ip0 == 172 && ip1 >= 16 && ip1 <= 31) || (ip0 == 192 && ip1 == 168)
+                        || (ip0 == 100 && (ip1 >= 64 && ip1 <= 127));
+            }
+        }
+
+        return false;
+    }
 }
+

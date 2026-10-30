@@ -41,6 +41,11 @@ public class BookController {
         this.standaloneService = standaloneService;
     }
 
+    @GetMapping("/health")
+    public ResponseEntity<?> health() {
+        return ResponseEntity.ok(Map.of("status", "UP"));
+    }
+
     @PostMapping({"/upload", "/books/upload"})
     public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file) {
         try {
